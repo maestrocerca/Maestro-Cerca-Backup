@@ -1,0 +1,81 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper: Checks if request is from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Checks if user possesses administrator privileges
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.email in [
+          'maestrocerca.mx@gmail.com', 
+          'admin@maestrocerca.mx',
+          'admin@zibata.mx'
+        ]
+      );
+    }
+
+    // =========================================================================
+    // 1. PUBLIC PORTFOLIO IMAGES
+    // Path: /portafolios/{uid}/{fileName}
+    // Threat Vectors Addressed:
+    // - Malware / Script Injection: Strict MIME-type regex image/(jpeg|png|webp).
+    // - Storage Exhaustion (DoS): Strictly capped at < 5MB.
+    // - Unauthorized Overwrites: Authenticated worker must own the path (request.auth.uid == uid).
+    // =========================================================================
+    match /portafolios/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() 
+        && request.auth.uid == uid
+        && request.resource.contentType.matches('image/(jpeg|png|webp)')
+        && request.resource.size < 5 * 1024 * 1024;
+      allow delete: if (isAuthenticated() && request.auth.uid == uid) || isAdmin();
+    }
+
+    // =========================================================================
+    // 2. CONFIDENTIAL VERIFICATION DOCUMENTS (Sensitive INE, Passports, Proofs)
+    // Path: /verificaciones/{uid}/{fileName}
+    // Threat Vectors Addressed:
+    // - Identity Theft / PII Data Leakage: READ IS STRICTLY ADMIN-ONLY (isAdmin()).
+    //   Never publicly queryable or accessible to third parties.
+    // - File Type Restrictions: Only image/jpeg, image/png, image/webp or application/pdf.
+    // - Storage Quota Protection: Hard cap at < 10MB.
+    // =========================================================================
+    match /verificaciones/{uid}/{fileName} {
+      // Read: Admin ONLY. Never publicly queryable.
+      allow read: if isAdmin();
+      
+      // Write: Authenticated worker uploading their own verification credentials
+      allow write: if isAuthenticated() 
+        && request.auth.uid == uid
+        && (
+          request.resource.contentType.matches('image/(jpeg|png|webp)') || 
+          request.resource.contentType == 'application/pdf'
+        )
+        && request.resource.size < 10 * 1024 * 1024;
+
+      allow delete: if isAdmin();
+    }
+
+    // Profile photos path (alias to portfolio rules)
+    match /maestros/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() 
+        && request.auth.uid == uid
+        && request.resource.contentType.matches('image/(jpeg|png|webp)')
+        && request.resource.size < 5 * 1024 * 1024;
+      allow delete: if (isAuthenticated() && request.auth.uid == uid) || isAdmin();
+    }
+
+    // Default deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

@@ -1,0 +1,22 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "maestros",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aprobado", "order": "ASCENDING" },
+        { "fieldPath": "oficio", "order": "ASCENDING" },
+        { "fieldPath": "calificacion", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "maestros",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aprobado", "order": "ASCENDING" },
+        { "fieldPath": "fechaRegistro", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

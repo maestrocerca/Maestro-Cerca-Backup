@@ -1,0 +1,82 @@
+{
+  "$schema": "https://raw.githubusercontent.com/firebase/firebase-tools/master/schema/firestore-blueprint.json",
+  "entities": {
+    "Maestro": {
+      "title": "Maestro",
+      "description": "Local trade craftsman or home service professional in Zibatá / Querétaro",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nombre": { "type": "string" },
+        "oficio": { "type": "string" },
+        "bio": { "type": "string" },
+        "calificacion": { "type": "number" },
+        "radioKm": { "type": "number" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "fotoUrl": { "type": "string" },
+        "telefonoWhatsApp": { "type": "string" },
+        "nivel": { "type": "string" },
+        "verificado": { "type": "boolean" },
+        "aprobado": { "type": "boolean" },
+        "fechaRegistro": { "type": "string" },
+        "userId": { "type": "string" },
+        "servicios": { "type": "array" },
+        "fotosTrabajo": { "type": "array" }
+      },
+      "required": ["id", "nombre", "oficio", "telefonoWhatsApp", "verificado", "aprobado"]
+    },
+    "SolicitudContacto": {
+      "title": "SolicitudContacto",
+      "description": "Lead and contact analytics event for WhatsApp or phone clicks in Zibatá",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "maestroId": { "type": "string" },
+        "fecha": { "type": "string" },
+        "origen": { "type": "string" }
+      },
+      "required": ["maestroId", "fecha", "origen"]
+    }
+  },
+  "firestore": {
+    "/maestros/{maestroId}": {
+      "schema": "Maestro",
+      "description": "Verified craftsmen and service providers in Zibatá and surrounding Querétaro areas"
+    },
+    "/solicitudes_contacto/{solicitudId}": {
+      "schema": "SolicitudContacto",
+      "description": "Lead and contact request records"
+    }
+  },
+  "collections": {
+    "maestros": {
+      "description": "Registered and verified trade workers and craftspeople in Zibatá/Querétaro",
+      "fields": {
+        "id": { "type": "string" },
+        "nombre": { "type": "string" },
+        "oficio": { "type": "string" },
+        "bio": { "type": "string" },
+        "calificacion": { "type": "number" },
+        "radioKm": { "type": "number" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "fotoUrl": { "type": "string" },
+        "telefonoWhatsApp": { "type": "string" },
+        "nivel": { "type": "string" },
+        "verificado": { "type": "boolean" },
+        "aprobado": { "type": "boolean" },
+        "fechaRegistro": { "type": "string" }
+      }
+    },
+    "solicitudes_contacto": {
+      "description": "Direct WhatsApp contact requests initiated from the platform",
+      "fields": {
+        "id": { "type": "string" },
+        "maestroId": { "type": "string" },
+        "fecha": { "type": "string" },
+        "origen": { "type": "string" }
+      }
+    }
+  }
+}
