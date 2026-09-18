@@ -17,18 +17,29 @@ describe('Admin Governance & RBAC Helper Utility', () => {
     expect(isAdminEmail(undefined as any)).toBe(false);
   });
 
-  it('validates custom claims cryptographic RBAC (token.admin === true or role === "admin")', () => {
-    // Custom claims admin=true takes precedence even if email is different
+  it('validates custom claims cryptographic RBAC (strictly token.admin === true)', () => {
+    // Custom claims admin=true is the sole authority
     expect(isUserAdmin({ email: 'custom-operator@domain.com' }, { admin: true })).toBe(true);
-    expect(isUserAdmin({ email: 'custom-operator@domain.com' }, { role: 'admin' })).toBe(true);
+    expect(isUserAdmin({ email: 'admin@maestrocerca.mx' }, { admin: true })).toBe(true);
 
-    // Negative custom claims with non-admin email
+    // Negative custom claims or role strings without admin: true are rejected
+    expect(isUserAdmin({ email: 'custom-operator@domain.com' }, { role: 'admin' })).toBe(false);
     expect(isUserAdmin({ email: 'custom-operator@domain.com' }, { role: 'worker' })).toBe(false);
     expect(isUserAdmin({ email: 'custom-operator@domain.com' }, { admin: false })).toBe(false);
   });
 
-  it('falls back to designated admin email when custom claims are not present', () => {
-    expect(isUserAdmin({ email: 'maestrocerca.mx@gmail.com' }, null)).toBe(true);
+  it('rejects authorization based on designated admin email when admin custom claim is absent', () => {
+    // Designated emails alone DO NOT grant admin authority without admin:true claim
+    expect(isUserAdmin({ email: 'maestrocerca.mx@gmail.com' }, null)).toBe(false);
+    expect(isUserAdmin({ email: 'maestrocerca.mx@gmail.com' }, {})).toBe(false);
     expect(isUserAdmin({ email: 'unauthorized@example.com' }, null)).toBe(false);
+  });
+
+  it('safely handles null, undefined, or missing user/email without throwing TypeError', () => {
+    expect(isUserAdmin(null)).toBe(false);
+    expect(isUserAdmin(undefined)).toBe(false);
+    expect(isUserAdmin({ email: null })).toBe(false);
+    expect(isUserAdmin({ email: undefined })).toBe(false);
+    expect(isUserAdmin({})).toBe(false);
   });
 });

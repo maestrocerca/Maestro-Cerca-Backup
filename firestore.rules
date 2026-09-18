@@ -12,17 +12,10 @@ service cloud.firestore {
     }
 
     // Checks if authenticated user possesses administrator privileges
-    // Checked via Firebase custom token claims or verified administrator email addresses
+    // Only Firebase Custom Claim admin == true authorizes administrative operations
     function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.admin == true ||
-        request.auth.token.role == 'admin' ||
-        request.auth.token.email in [
-          'maestrocerca.mx@gmail.com', 
-          'admin@maestrocerca.mx',
-          'admin@zibata.mx'
-        ]
-      );
+      return request.auth != null &&
+             request.auth.token.admin == true;
     }
 
     // Checks if the authenticated user owns this specific maestro document
@@ -30,6 +23,17 @@ service cloud.firestore {
       return isAuthenticated() && (
         request.auth.uid == maestroId || 
         (resource != null && resource.data.userId == request.auth.uid)
+      );
+    }
+
+    // Checks if the authenticated user owns the parent maestro or is owner of the private dossier
+    function canAccessPrivadoDoc(maestroId) {
+      return isAuthenticated() && (
+        request.auth.uid == maestroId ||
+        (request.resource != null && request.resource.data.userId == request.auth.uid) ||
+        (resource != null && resource.data.userId == request.auth.uid) ||
+        (exists(/databases/$(database)/documents/maestros/$(maestroId)) &&
+         get(/databases/$(database)/documents/maestros/$(maestroId)).data.userId == request.auth.uid)
       );
     }
 
@@ -45,53 +49,119 @@ service cloud.firestore {
     match /maestros/{maestroId} {
       // Read access: Public access strictly constrained to approved profiles.
       // Administrators and profile owners can read all/unapproved documents.
-      allow list: if resource.data.aprobado == true || isAdmin();
-      allow get: if resource.data.aprobado == true || isMaestroOwner(maestroId) || isAdmin();
+      allow list: if (resource != null && resource.data.aprobado == true) || isAdmin();
+      allow get: if isMaestroOwner(maestroId) || (resource != null && resource.data.aprobado == true) || isAdmin();
 
       // Create: Authenticated users can register with initial state strictly constrained.
-      // Incoming data MUST have aprobado == false and verificado == false. Admins can create directly.
+      // Incoming data MUST have aprobado == false and verificado == false.
+      // Strictly enforce that maestroId equals authenticated user's UID (1 human = 1 UID = 1 doc).
       allow create: if (
         isAuthenticated() && 
-        (request.auth.uid == maestroId || request.resource.data.userId == request.auth.uid) &&
+        request.auth.uid == maestroId &&
+        request.resource.data.userId == request.auth.uid &&
         request.resource.data.aprobado == false &&
         request.resource.data.verificado == false
       ) || isAdmin();
 
       // Update: 
       // - Administrators can modify any field.
-      // - Profile owners CANNOT modify critical governance fields:
-      //   ['aprobado', 'verificado', 'calificacion', 'nivel']
+      // - Profile owners CANNOT modify critical governance and verification fields:
+      //   ['aprobado', 'statusPerfil', 'verificado', 'calificacion', 'nivel', 'verificationStatus', 'identityVerified', 'referencesVerified', 'photosReviewed', 'phoneVerified', 'phoneVerifiedAt', 'phoneVerificationMethod', 'authProviders']
+      // - Non-administrators can NEVER set profilePhotoReviewStatus to 'approved' directly
       allow update: if (
         isMaestroOwner(maestroId) &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'aprobado', 
+          'statusPerfil',
           'verificado', 
           'calificacion', 
-          'nivel'
-        ])
+          'nivel',
+          'verificationStatus',
+          'identityVerified',
+          'referencesVerified',
+          'photosReviewed',
+          'phoneVerified',
+          'phoneVerifiedAt',
+          'phoneVerificationMethod',
+          'authProviders'
+        ]) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profilePhotoReviewStatus']) ||
+          request.resource.data.profilePhotoReviewStatus == 'pending'
+        )
       ) || isAdmin();
 
-      // Delete: Admin only to prevent malicious loss of service data
-      allow delete: if isAdmin();
+      // Delete: Owner or Admin allowed for account self-deletion & privacy rights
+      allow delete: if isMaestroOwner(maestroId) || isAdmin();
 
-      // Sensitive document references subcollection (INE, official verification records)
-      // Non-admins have zero read/write access to this /privado/ subcollection
-      match /privado/{privadoDoc=**} {
-        allow read, write: if isAdmin();
+      // Private media and verification subcollection (never accessible to public visitors)
+      match /privado/{docId} {
+        allow read: if canAccessPrivadoDoc(maestroId) || isAdmin();
+        allow create, update: if (
+          canAccessPrivadoDoc(maestroId) &&
+          (!request.resource.data.keys().hasAny(['status']) || request.resource.data.status == 'pending') &&
+          (!request.resource.data.keys().hasAny(['profilePhotoReviewStatus']) || request.resource.data.profilePhotoReviewStatus == 'pending') &&
+          !request.resource.data.keys().hasAny(['verified', 'approved', 'identityVerified', 'referencesVerified', 'photosReviewed', 'verifiedAt', 'verifiedBy', 'adminNotes'])
+        ) || isAdmin();
+        allow delete: if canAccessPrivadoDoc(maestroId) || isAdmin();
       }
     }
 
     // =========================================================================
-    // 2. SOLICITUDES_CONTACTO COLLECTION (Lead Analytics & Telemetry)
+    // REPORTES_PERFIL COLLECTION (User Profile Reports)
+    // Read: Strictly Admin only.
+    // Write: Admin only (written via secure backend /api/profile-reports endpoint).
+    // =========================================================================
+    match /reportes_perfil/{reportId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // =========================================================================
+    // 3. PRE_WORKERS COLLECTION (ManyChat / WhatsApp Preliminary Registrations)
+    // Threat Vectors Addressed:
+    // - Never auto-verified: verificado MUST be false at creation.
+    // - Claim integrity: Only the authenticated user whose verified phone matches
+    //   can claim the preWorker, setting status to 'claimed' and claimedByUid.
+    // - Anti-hijack: Once claimed, no other UID can claim or overwrite the preWorker.
+    // =========================================================================
+    match /preWorkers/{preWorkerId} {
+      // Read access: Admin can list/get all; authenticated users can only get if they claimed it or match verified phone
+      allow list: if isAdmin();
+      allow get: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.claimedByUid == request.auth.uid ||
+          resource.data.phoneNumber == request.auth.token.phone_number
+        )
+      );
+
+      // Create: Admin only (ManyChat webhook and import write via Admin SDK on the server)
+      allow create: if isAdmin();
+
+      // Update: Admin or authenticated user claiming their own preliminary profile with restricted keys
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.status == 'pending_claim' &&
+        request.resource.data.status == 'claimed' &&
+        request.resource.data.claimedByUid == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'claimedByUid', 'claimedAt', 'updatedAt'])
+      );
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // =========================================================================
+    // 4. SOLICITUDES_CONTACTO COLLECTION (Lead Analytics & Telemetry)
     // Threat Vectors Addressed:
     // - Competitor Lead Scraping: 100% blocked (read access is Admin-only).
     // - Payload Flooding / Malicious Payloads: Creation strictly validates required
-    //   origin token ('zibata_web'), maestroId, timestamp, and field whitelist.
+    //   origin token ('maestro_cerca_web' or 'zibata_web'), maestroId, timestamp, and field whitelist.
     // =========================================================================
     match /solicitudes_contacto/{solicitudId} {
       // Public creation allowed ONLY if required fields exist and payload has no extraneous tokens
       allow create: if request.resource.data.keys().hasAll(['maestroId', 'origen', 'timestamp'])
-        && request.resource.data.origen == 'zibata_web'
+        && request.resource.data.origen in ['maestro_cerca_web', 'zibata_web']
         && request.resource.data.maestroId is string
         && request.resource.data.keys().hasOnly([
           'id', 
@@ -112,7 +182,7 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // 3. TRADES & SERVICE AREAS (Catalog metadata)
+    // 5. TRADES & SERVICE AREAS (Catalog metadata)
     // =========================================================================
     match /trades/{tradeId} {
       allow read: if true;
@@ -124,39 +194,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // =========================================================================
-    // 4. LEGACY WORKERS & CONTACT EVENTS (Backward compatibility)
-    // =========================================================================
-    match /workers/{workerId} {
-      allow list: if resource.data.aprobado == true || isAdmin();
-      allow get: if resource.data.aprobado == true || isMaestroOwner(workerId) || isAdmin();
-      allow create: if (
-        isAuthenticated() && 
-        (request.auth.uid == workerId || request.resource.data.userId == request.auth.uid) &&
-        request.resource.data.aprobado == false &&
-        request.resource.data.verificado == false
-      ) || isAdmin();
-      allow update: if (
-        isMaestroOwner(workerId) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'aprobado', 
-          'verificado', 
-          'calificacion', 
-          'nivel',
-          'verificationStatus'
-        ])
-      ) || isAdmin();
-      allow delete: if isAdmin();
-
-      match /privado/{privadoDoc=**} {
-        allow read, write: if isAdmin();
-      }
-    }
-
-    match /contactEvents/{eventId} {
-      allow create: if request.resource.data.type in ['profileView', 'whatsapp', 'phone'];
-      allow read: if isAdmin();
-      allow update, delete: if false;
+    match /catalogos/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /analytics/{docId} {

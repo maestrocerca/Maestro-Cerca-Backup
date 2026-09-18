@@ -5,6 +5,7 @@ import {
   MapPin, 
   ImageIcon, 
   ShieldCheck, 
+  Shield,
   Award, 
   ExternalLink, 
   CheckCircle2, 
@@ -21,10 +22,18 @@ import {
   Camera,
   Mail,
   Send,
-  RefreshCw
+  RefreshCw,
+  X,
+  Link2,
+  AlertTriangle,
+  PauseCircle,
+  PlayCircle
 } from 'lucide-react';
+import { ConfirmationResult } from 'firebase/auth';
 import { useStore } from '../context/StoreContext';
 import { WorkPhoto } from '../types';
+import { WorkerAvatar } from './WorkerAvatar';
+import { VerificationRadialProgress, VerificationRequirementItem } from './VerificationRadialProgress';
 import { 
   uploadWorkerProfileImage, 
   uploadWorkerWorkPhoto, 
@@ -37,18 +46,29 @@ export const WorkerDashboardView: React.FC = () => {
   const { 
     currentWorker, 
     firebaseUser,
+    logoutWorker,
     updateWorkerProfile, 
+    setWorkerAvailability,
     submitVerificationRequest, 
+    submitPendingProfilePhoto,
     addWorkerPhoto, 
+    addWorkerPhotosBatch,
     removeWorkerPhoto, 
+    removeWorkerPhotoByUrl,
+    deleteWorkerAccount,
     calculateProfileCompletion, 
     trades, 
     serviceAreas, 
     navigateTo,
-    contactEvents 
+    contactEvents,
+    showToast,
+    linkFacebookAccount,
+    sendPhoneLinkVerificationCode,
+    confirmPhoneLinkCode,
+    isAdmin
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'services' | 'photos' | 'verification' | 'stats'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'photos' | 'stats'>('profile');
 
   // Local Form state for editing
   const [formData, setFormData] = useState({
@@ -73,14 +93,83 @@ export const WorkerDashboardView: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
+  const [pendingPhotoPreviewUrl, setPendingPhotoPreviewUrl] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ total: number; current: number } | null>(null);
+  const [isDraggingPhotos, setIsDraggingPhotos] = useState(false);
 
-  // Verification request form state
+  // Gallery photo deletion modal state
+  const [photoToDelete, setPhotoToDelete] = useState<{ id: string; url: string; title: string } | null>(null);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
+
+  // Self-deletion modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState('');
+
+  // Worker availability modal state
+  const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
+  const [isTogglingAvailability, setIsTogglingAvailability] = useState(false);
+
+  // Verification request form state (optional documents and optional notes, NO references)
   const [verifDocFile, setVerifDocFile] = useState<File | null>(null);
-  const [verifDocName, setVerifDocName] = useState('INE_anverso_reverso.pdf');
-  const [verifReferences, setVerifReferences] = useState('Ing. Salvador Vega (Obra Juriquilla) - 4421998877\nArq. Mariana Morales (Condominio Zibatá) - 4425556611');
-  const [verifNotes, setVerifNotes] = useState('Cuento con experiencia comprobable y referencias vigentes en Querétaro.');
+  const [verifDocName, setVerifDocName] = useState('');
+  const [verifNotes, setVerifNotes] = useState('');
   const [verifSubmitted, setVerifSubmitted] = useState(false);
   const [isSubmittingVerif, setIsSubmittingVerif] = useState(false);
+
+  // ManyChat / WhatsApp claimed profile one-time banner
+  const [showManyChatBanner, setShowManyChatBanner] = useState(() => {
+    if (!currentWorker) return false;
+    const isFromManyChat = currentWorker.source === 'manychat' || Boolean(currentWorker.claimedFromPreWorkerId);
+    if (!isFromManyChat) return false;
+    const dismissedKey = `manychat_claimed_dismissed_${currentWorker.id}`;
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(dismissedKey) !== 'true';
+    }
+    return true;
+  });
+
+  const handleDismissManyChatBanner = () => {
+    if (currentWorker) {
+      localStorage.setItem(`manychat_claimed_dismissed_${currentWorker.id}`, 'true');
+    }
+    setShowManyChatBanner(false);
+  };
+
+  // Normalized portfolio photos list from both workPhotos and fotosTrabajos
+  const portfolioPhotos = React.useMemo(() => {
+    if (!currentWorker) return [];
+    const list: Array<{ id: string; url: string; title: string }> = [];
+    const seen = new Set<string>();
+
+    if (currentWorker.workPhotos && Array.isArray(currentWorker.workPhotos)) {
+      currentWorker.workPhotos.forEach((p, idx) => {
+        if (p?.url && !seen.has(p.url)) {
+          seen.add(p.url);
+          list.push({
+            id: p.id || `wp-${idx}`,
+            url: p.url,
+            title: p.title || 'Trabajo realizado'
+          });
+        }
+      });
+    }
+
+    if (currentWorker.fotosTrabajos && Array.isArray(currentWorker.fotosTrabajos)) {
+      currentWorker.fotosTrabajos.forEach((url, idx) => {
+        if (url && typeof url === 'string' && !seen.has(url)) {
+          seen.add(url);
+          list.push({
+            id: `ft-${idx}`,
+            url,
+            title: 'Trabajo realizado'
+          });
+        }
+      });
+    }
+
+    return list;
+  }, [currentWorker?.workPhotos, currentWorker?.fotosTrabajos]);
 
   // Sync formData whenever currentWorker updates from Firestore
   React.useEffect(() => {
@@ -102,7 +191,12 @@ export const WorkerDashboardView: React.FC = () => {
     }
   }, [currentWorker?.id, currentWorker?.updatedAt]);
 
-  if (!currentWorker || !firebaseUser) {
+  if (isAdmin) {
+    navigateTo({ type: 'admin' });
+    return null;
+  }
+
+  if (!firebaseUser) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center bg-[#FAFAFA] py-16 px-4">
         <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xs text-center space-y-5">
@@ -112,7 +206,7 @@ export const WorkerDashboardView: React.FC = () => {
           <div className="space-y-2">
             <h2 className="text-2xl font-black text-slate-900 tracking-tight">Acceso protegido</h2>
             <p className="text-slate-600 text-sm leading-relaxed">
-              Debes iniciar sesión con tu cuenta de trabajador de Firebase Authentication para acceder a tu panel de control.
+              Debes iniciar sesión con tu cuenta de trabajador para acceder a tu panel de control.
             </p>
           </div>
           <button
@@ -126,14 +220,315 @@ export const WorkerDashboardView: React.FC = () => {
     );
   }
 
+  if (!currentWorker) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center bg-[#FAFAFA] py-16 px-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xs text-center space-y-5">
+          <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Registro incompleto</h2>
+            <p className="text-slate-600 text-sm leading-relaxed">
+              Tu sesión está activa, pero aún no has completado tu perfil de maestro en la plataforma. Completa los pasos para activar tu perfil y acceder a tu panel.
+            </p>
+          </div>
+          <div className="space-y-2.5 pt-2">
+            <button
+              onClick={() => navigateTo({ type: 'register' })}
+              className="w-full py-3.5 px-6 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              Completar mi registro
+            </button>
+            <button
+              onClick={logoutWorker}
+              className="w-full py-2.5 px-4 text-slate-600 hover:text-slate-900 font-medium text-sm transition-colors cursor-pointer"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const completionScore = calculateProfileCompletion(currentWorker);
-  const isVerified = currentWorker.verificationStatus === 'verified';
+  const isVerified = currentWorker.verificationStatus === 'verified' || currentWorker.verificado === true;
+
+  // Real Provider inspection directly from Firebase Authentication
+  const providers = firebaseUser?.providerData || [];
+  const phoneProvider = providers.find((p) => p.providerId === 'phone');
+  const facebookProvider = providers.find((p) => p.providerId === 'facebook.com');
+
+  const authPhoneDigits = (firebaseUser?.phoneNumber || phoneProvider?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+  const currentPhoneDigits = (formData.phone || currentWorker.phone || '').replace(/\D/g, '').slice(-10);
+
+  // Phone is truly linked if Firebase Auth has the phone provider AND matches current phone
+  const isPhoneLinked = Boolean(
+    (phoneProvider || firebaseUser?.phoneNumber) &&
+    Boolean(authPhoneDigits) &&
+    (!currentPhoneDigits || authPhoneDigits === currentPhoneDigits)
+  );
+
+  // Phone is truly verified ONLY if Firebase Auth confirmed SMS and doc has phoneVerified
+  const isTrulyPhoneVerified = Boolean(
+    currentWorker.phoneVerified &&
+    isPhoneLinked
+  );
+
+  const isFacebookLinked = Boolean(facebookProvider);
+  const isAvailable = currentWorker.isAvailable !== false;
+
+  // Core verification requirements calculation:
+  // 1. Nombre y oficio
+  const reqNameTrade = Boolean(
+    ((formData.firstName && formData.lastName) || (currentWorker.firstName && currentWorker.lastName) || currentWorker.nombre) &&
+    (formData.mainTrade || currentWorker.mainTrade || currentWorker.oficio)
+  );
+
+  // 2. Teléfono verificado por SMS
+  const reqPhone = isTrulyPhoneVerified;
+
+  // 3. Foto aprobada por administración
+  const reqPhotoApproved = Boolean(
+    (currentWorker.profilePhoto || currentWorker.fotoUrl) &&
+    currentWorker.profilePhotoReviewStatus === 'approved'
+  );
+
+  // 4. Al menos 3 fotos de trabajos
+  const reqWorkPhotos3 = Boolean(
+    portfolioPhotos.length >= 3 ||
+    (currentWorker.workPhotos && currentWorker.workPhotos.length >= 3) ||
+    (currentWorker.fotosTrabajos && currentWorker.fotosTrabajos.length >= 3)
+  );
+
+  // 5. Al menos 2 servicios
+  const reqServices2 = Boolean(formData.services && formData.services.length >= 2);
+
+  const verificationItems: VerificationRequirementItem[] = [
+    {
+      id: 'nameTrade',
+      label: 'Nombre y oficio',
+      isCompleted: reqNameTrade,
+      hint: 'Nombre completo y especialidad u oficio principal',
+      actionTab: 'profile',
+      anchorId: 'section-basic-info',
+    },
+    {
+      id: 'phone',
+      label: 'Teléfono verificado',
+      isCompleted: reqPhone,
+      hint: 'Número de WhatsApp autenticado con SMS',
+      actionTab: 'profile',
+      anchorId: 'access-methods-section',
+    },
+    {
+      id: 'photo',
+      label: 'Foto de perfil aprobada',
+      isCompleted: reqPhotoApproved,
+      hint: currentWorker.profilePhotoReviewStatus === 'pending'
+        ? 'Foto enviada, pendiente de revisión administrativa'
+        : currentWorker.profilePhotoReviewStatus === 'rejected'
+        ? 'Foto rechazada. Por favor sube una nueva imagen'
+        : 'Fotografía personal revisada y aprobada por el equipo',
+      actionTab: 'profile',
+      anchorId: 'section-profile-header',
+    },
+    {
+      id: 'workPhotos',
+      label: 'Al menos 3 fotos de trabajos',
+      isCompleted: reqWorkPhotos3,
+      hint: `Tienes ${portfolioPhotos.length} de 3 fotos mínimas en tu portafolio`,
+      actionTab: 'photos',
+    },
+    {
+      id: 'services',
+      label: 'Al menos 2 servicios que realizas',
+      isCompleted: reqServices2,
+      hint: `Tienes ${formData.services.length} de 2 servicios mínimos registrados`,
+      actionTab: 'profile',
+      anchorId: 'worker-services-section',
+    },
+  ];
+
+  const completedVerificationCount = verificationItems.filter((i) => i.isCompleted).length;
+  const totalVerificationCount = verificationItems.length;
+  const allVerificationRequirementsMet = completedVerificationCount === totalVerificationCount;
 
   // Metrics for this worker
   const workerEvents = contactEvents.filter((e) => e.workerId === currentWorker.id);
   const whatsappCount = workerEvents.filter((e) => e.type === 'whatsapp').length;
   const phoneCount = workerEvents.filter((e) => e.type === 'phone').length;
   const viewCount = workerEvents.filter((e) => e.type === 'profileView').length;
+
+  const phoneValue = firebaseUser?.phoneNumber || phoneProvider?.phoneNumber || currentWorker?.phone;
+  const facebookDisplayName = facebookProvider?.displayName || (isFacebookLinked ? (firebaseUser?.displayName || 'Facebook') : '');
+
+  const formatMaskedPhone = (val?: string | null): string => {
+    if (!val) return '';
+    const digits = val.replace(/\D/g, '');
+    if (digits.length < 4) return val;
+    const last4 = digits.slice(-4);
+    return `+52 •••• •••• ${last4}`;
+  };
+
+  // Account Linking States
+  const [isLinkingFacebook, setIsLinkingFacebook] = useState(false);
+  const [linkingError, setLinkingError] = useState('');
+  const [linkingSuccess, setLinkingSuccess] = useState('');
+
+  // Phone Linking Sub-flow
+  const [showPhoneLinkForm, setShowPhoneLinkForm] = useState(false);
+  const [linkPhoneDigits, setLinkPhoneDigits] = useState('');
+  const [linkSmsCode, setLinkSmsCode] = useState('');
+  const [linkConfirmationResult, setLinkConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [isSendingPhoneSms, setIsSendingPhoneSms] = useState(false);
+  const [isConfirmingPhoneSms, setIsConfirmingPhoneSms] = useState(false);
+  const [linkCooldown, setLinkCooldown] = useState(0);
+
+  React.useEffect(() => {
+    let timer: any = null;
+    if (linkCooldown > 0) {
+      timer = setInterval(() => {
+        setLinkCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [linkCooldown]);
+
+  const handleLinkFacebook = async () => {
+    setLinkingError('');
+    setLinkingSuccess('');
+    setIsLinkingFacebook(true);
+    try {
+      const res = await linkFacebookAccount();
+      if (res.success) {
+        setLinkingSuccess('Cuenta de Facebook vinculada exitosamente a tu perfil.');
+      } else if (res.error) {
+        console.error('[Facebook Link Error in View]:', res.error);
+        setLinkingError(res.error);
+      }
+    } catch (err: any) {
+      console.error('[Facebook Link Exception in View]:', err?.code, err?.message, err);
+      setLinkingError(err?.message || 'Error al vincular cuenta de Facebook.');
+    } finally {
+      setIsLinkingFacebook(false);
+    }
+  };
+
+  const handleSendPhoneLinkSms = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setLinkingError('');
+    setLinkingSuccess('');
+    const clean = linkPhoneDigits.replace(/\D/g, '').slice(0, 10);
+    if (clean.length !== 10) {
+      setLinkingError('Por favor ingresa los 10 dígitos de tu número celular.');
+      return;
+    }
+
+    if (!firebaseUser) {
+      setLinkingError('Debes tener una sesión activa para vincular un teléfono.');
+      return;
+    }
+
+    setIsSendingPhoneSms(true);
+    const formattedE164 = `+52${clean}`;
+
+    // Pre-check phone availability with backend using intent: 'link' and Bearer token
+    try {
+      const token = await firebaseUser.getIdToken(true);
+      const checkRes = await fetch('/api/auth/phone-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          phone: formattedE164,
+          intent: 'link',
+        }),
+      });
+
+      if (!checkRes.ok) {
+        const errorData = await checkRes.json().catch(() => ({}));
+        setLinkingError(errorData?.error || 'No pudimos verificar la disponibilidad de este teléfono. Intenta de nuevo.');
+        setIsSendingPhoneSms(false);
+        return;
+      }
+
+      const checkData = await checkRes.json();
+      if (!checkData?.success) {
+        setLinkingError(checkData?.error || 'No pudimos verificar la disponibilidad de este teléfono. Intenta de nuevo.');
+        setIsSendingPhoneSms(false);
+        return;
+      }
+
+      if (checkData.usedByOther === true) {
+        setLinkingError('Este teléfono ya está asociado a otra cuenta de Maestro Cerca.');
+        setIsSendingPhoneSms(false);
+        return;
+      }
+    } catch (checkErr: any) {
+      setLinkingError('No pudimos verificar la disponibilidad de este teléfono. Intenta de nuevo.');
+      setIsSendingPhoneSms(false);
+      return;
+    }
+
+    try {
+      const res = await sendPhoneLinkVerificationCode(formattedE164, 'link-phone-recaptcha-container');
+      if (res.success && res.confirmationResult) {
+        setLinkConfirmationResult(res.confirmationResult);
+        setLinkCooldown(60);
+        setLinkingSuccess('Código SMS enviado a tu celular.');
+      } else if (res.error) {
+        setLinkingError(res.error);
+      }
+    } catch (err: any) {
+      setLinkingError(err?.message || 'Error al enviar código SMS de verificación.');
+    } finally {
+      setIsSendingPhoneSms(false);
+    }
+  };
+
+  const handleConfirmPhoneLink = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!linkConfirmationResult) return;
+    setLinkingError('');
+    setLinkingSuccess('');
+    const clean = linkSmsCode.trim().replace(/\D/g, '');
+    if (clean.length < 6) {
+      setLinkingError('Ingresa el código completo de 6 dígitos recibido por SMS.');
+      return;
+    }
+
+    setIsConfirmingPhoneSms(true);
+    try {
+      const res = await confirmPhoneLinkCode(linkConfirmationResult, clean);
+      if (res.success) {
+        setLinkingSuccess('Número celular vinculado exitosamente a tu cuenta.');
+        const cleanDigits = linkPhoneDigits.replace(/\D/g, '').slice(0, 10);
+        if (cleanDigits) {
+          setFormData((prev) => ({
+            ...prev,
+            phone: cleanDigits,
+            whatsapp: prev.whatsapp || cleanDigits,
+          }));
+        }
+        setShowPhoneLinkForm(false);
+        setLinkPhoneDigits('');
+        setLinkSmsCode('');
+        setLinkConfirmationResult(null);
+      } else if (res.error) {
+        setLinkingError(res.error);
+      }
+    } catch (err: any) {
+      setLinkingError(err?.message || 'Error al confirmar código SMS.');
+    } finally {
+      setIsConfirmingPhoneSms(false);
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,7 +543,7 @@ export const WorkerDashboardView: React.FC = () => {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3500);
       } else {
-        setSaveError(res.error || 'No se pudieron guardar los cambios en Firestore.');
+        setSaveError(res.error || 'Ocurrió un error al guardar los cambios. Intenta de nuevo.');
       }
     } finally {
       setIsSaving(false);
@@ -161,65 +556,136 @@ export const WorkerDashboardView: React.FC = () => {
     const file = files[0];
     const check = validateImageFile(file, 5);
     if (!check.valid) {
-      setSaveError(check.error || 'Archivo inválido');
+      setSaveError(check.error || 'Archivo inválido. Se requiere JPEG, PNG o WebP de hasta 5MB.');
+      showToast(check.error || 'Archivo inválido');
       return;
     }
 
     setIsUploadingProfilePhoto(true);
     setSaveError('');
     try {
-      const downloadUrl = await uploadWorkerProfileImage(currentWorker.userId || currentWorker.id, file);
-      setFormData((prev) => ({ ...prev, profilePhoto: downloadUrl }));
-      await updateWorkerProfile(currentWorker.id, { profilePhoto: downloadUrl });
+      const uploadRes = await uploadWorkerProfileImage(currentWorker.userId || currentWorker.id, file);
+      const localUrl = URL.createObjectURL(file);
+      setPendingPhotoPreviewUrl(localUrl);
+
+      await submitPendingProfilePhoto(currentWorker.id, uploadRes.storagePath);
+      showToast('Foto de perfil subida. Está en revisión de moderación antes de publicarse.');
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3500);
     } catch (err: any) {
       console.error('Profile photo upload error:', err);
-      setSaveError(err?.message || 'Error al subir foto de perfil a Firebase Storage.');
+      const errMsg = 'Ocurrió un error al subir la foto de perfil. Intenta de nuevo.';
+      setSaveError(errMsg);
+      showToast(errMsg);
     } finally {
       setIsUploadingProfilePhoto(false);
+      e.target.value = '';
     }
   };
 
-  const handleAddWorkPhotoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    const check = validateImageFile(file, 5);
-    if (!check.valid) {
-      setSaveError(check.error || 'Archivo inválido');
-      return;
+  const processAndUploadWorkPhotos = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
+    for (const file of fileArray) {
+      const check = validateImageFile(file, 5);
+      if (!check.valid) {
+        setSaveError(check.error || `El archivo ${file.name} no es una imagen válida (JPG, PNG, WebP máx. 5MB).`);
+        showToast(check.error || 'Uno de los archivos no es válido.');
+        return;
+      }
     }
 
     setIsUploadingPhoto(true);
     setSaveError('');
+    setUploadProgress({ total: fileArray.length, current: 0 });
+
     try {
-      const uploaded = await uploadWorkerWorkPhoto(
-        currentWorker.userId || currentWorker.id, 
-        file, 
-        newPhotoTitle
-      );
-      await addWorkerPhoto(currentWorker.id, {
-        url: uploaded.url,
-        title: uploaded.title,
-      });
+      const uploadedResults: Array<{ url: string; title: string }> = [];
+
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        setUploadProgress({ total: fileArray.length, current: i + 1 });
+        const uploaded = await uploadWorkerWorkPhoto(
+          currentWorker.userId || currentWorker.id, 
+          file, 
+          newPhotoTitle.trim() || undefined,
+          i
+        );
+        uploadedResults.push(uploaded);
+      }
+
+      await addWorkerPhotosBatch(currentWorker.id, uploadedResults);
       setNewPhotoTitle('');
+      showToast(`Se agregaron ${uploadedResults.length} foto${uploadedResults.length > 1 ? 's' : ''} a tu portafolio.`);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3500);
     } catch (err: any) {
-      console.error('Work photo upload error:', err);
-      setSaveError(err?.message || 'Error al subir la fotografía de trabajo a Firebase Storage.');
+      console.error('Work photo batch upload error:', err);
+      const errMsg = 'Ocurrió un error al guardar los cambios. Intenta de nuevo.';
+      setSaveError(errMsg);
+      showToast(errMsg);
     } finally {
       setIsUploadingPhoto(false);
+      setUploadProgress(null);
     }
+  };
+
+  const handleWorkPhotosFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      await processAndUploadWorkPhotos(e.target.files);
+      e.target.value = '';
+    }
+  };
+
+  const handleConfirmDeletePhoto = async () => {
+    if (!photoToDelete || !currentWorker) return;
+    setIsDeletingPhoto(true);
+    try {
+      await removeWorkerPhotoByUrl(currentWorker.id, photoToDelete.url);
+      if (photoToDelete.id && !photoToDelete.id.startsWith('ft-')) {
+        await removeWorkerPhoto(currentWorker.id, photoToDelete.id);
+      }
+      showToast('Fotografía eliminada del portafolio.');
+      setPhotoToDelete(null);
+    } catch (err: any) {
+      console.error('Error removing photo:', err);
+      showToast('Error al eliminar la fotografía.');
+    } finally {
+      setIsDeletingPhoto(false);
+    }
+  };
+
+  const TRADE_SERVICE_SUGGESTIONS: Record<string, string[]> = {
+    'Albañil': ['Bardas y muros', 'Aplanados y yeso', 'Colocación de piso y azulejo', 'Firme de concreto', 'Remodelaciones', 'Cisterna'],
+    'Plomero': ['Reparación de fugas', 'Instalación de tinaco', 'Instalación de calentador / boiler', 'Destape de drenaje', 'Instalación de grifería', 'Bomba de agua'],
+    'Electricista': ['Cableado e instalaciones', 'Localización de cortos', 'Instalación de lámparas y luminarias', 'Centro de carga y pastillas', 'Contactos y apagadores', 'Instalación 220V'],
+    'Pintor': ['Pintura interior', 'Pintura de fachadas', 'Impermeabilización de techos', 'Esmalte en herrería', 'Texturizados y pastas', 'Barniz en madera'],
+    'Carpintero': ['Puertas de madera', 'Closets a medida', 'Cocinas integrales', 'Muebles de baño', 'Reparación y ajuste de muebles', 'Chapas y cerraduras'],
+    'Herrero': ['Puertas y portones', 'Protecciones para ventanas', 'Barandales y pasamanos', 'Estructuras metálicas', 'Reparación de herrería', 'Techumbres ligeras'],
+    'Tablarroquero': ['Muros de tablaroca', 'Plafones lisos y decorativos', 'Muebles de tablaroca', 'Aislamiento acústico', 'Reparación de grietas y huecos'],
+    'Impermeabilizador': ['Impermeabilización con manto asfáltico', 'Impermeabilización acrílica', 'Sellado de grietas', 'Tratamiento de humedad', 'Desagües pluviales'],
+    'Instalador de pisos': ['Piso cerámico', 'Porcelanato', 'Piso laminado y vinílico', 'Zoclo y remates', 'Nivelación de firme'],
+    'Mantenimiento general': ['Mantenimiento residencial', 'Reparaciones menores del hogar', 'Pintura y retoques', 'Plomería básica', 'Instalaciones eléctricas básicas']
   };
 
   const handleAddServiceItem = () => {
     if (newService.trim()) {
-      const updated = [...formData.services, newService.trim()];
+      const trimmed = newService.trim();
+      if (!formData.services.includes(trimmed)) {
+        const updated = [...formData.services, trimmed];
+        setFormData({ ...formData, services: updated });
+        updateWorkerProfile(currentWorker.id, { services: updated });
+      }
+      setNewService('');
+    }
+  };
+
+  const handleAddSuggestedService = (serviceText: string) => {
+    if (!formData.services.includes(serviceText)) {
+      const updated = [...formData.services, serviceText];
       setFormData({ ...formData, services: updated });
       updateWorkerProfile(currentWorker.id, { services: updated });
-      setNewService('');
     }
   };
 
@@ -231,31 +697,79 @@ export const WorkerDashboardView: React.FC = () => {
 
   const handleVerificationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentWorker) return;
+    if (!allVerificationRequirementsMet) {
+      setSaveError('Completa los requisitos obligatorios antes de solicitar revisión.');
+      return;
+    }
     setIsSubmittingVerif(true);
     setSaveError('');
     try {
-      let finalDocPath = verifDocName;
+      let finalDocPath = '';
       if (verifDocFile && firebaseUser) {
-        const uploadRes = await uploadVerificationDocument(firebaseUser.uid, verifDocFile, 'ine');
+        const uploadRes = await uploadVerificationDocument(firebaseUser.uid, verifDocFile, 'comprobante');
         finalDocPath = uploadRes.storagePath;
       }
 
       const res = await submitVerificationRequest(currentWorker.id, {
-        documents: [finalDocPath],
-        references: [verifReferences],
-        notes: verifNotes,
+        documents: finalDocPath ? [finalDocPath] : [],
+        notes: verifNotes.trim(),
       });
 
       if (res.success) {
         setVerifSubmitted(true);
+        showToast('Solicitud de revisión enviada exitosamente.');
       } else {
         setSaveError(res.error || 'No se pudo enviar la solicitud.');
       }
     } catch (err: any) {
       console.error('Verification submission error:', err);
-      setSaveError(err?.message || 'Error al procesar los documentos de verificación.');
+      setSaveError(err?.message || 'Error al procesar la solicitud de verificación.');
     } finally {
       setIsSubmittingVerif(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!currentWorker) return;
+    setIsDeletingAccount(true);
+    setDeleteAccountError('');
+    try {
+      const res = await deleteWorkerAccount(currentWorker.id);
+      if (res.success) {
+        setShowDeleteModal(false);
+        navigateTo({ type: 'home' });
+      } else {
+        setDeleteAccountError(res.error || 'No se pudo eliminar la cuenta. Intenta de nuevo.');
+        setIsDeletingAccount(false);
+      }
+    } catch (err: any) {
+      setDeleteAccountError(err?.message || 'Ocurrió un error al eliminar tu cuenta.');
+      setIsDeletingAccount(false);
+    }
+  };
+
+  const handleToggleAvailability = async () => {
+    if (!currentWorker) return;
+    setIsTogglingAvailability(true);
+    try {
+      const nextVal = !isAvailable;
+      const res = await setWorkerAvailability(currentWorker.id, nextVal);
+      if (res.success) {
+        showToast(
+          nextVal
+            ? 'Tu perfil vuelve a estar disponible para clientes.'
+            : 'Tu disponibilidad ha sido pausada temporalmente.'
+        );
+        setShowAvailabilityModal(false);
+      } else {
+        showToast(res.error || 'No se pudo actualizar la disponibilidad.');
+      }
+    } catch (err: any) {
+      console.error('Availability toggle error:', err);
+      showToast('Error al actualizar disponibilidad.');
+    } finally {
+      setIsTogglingAvailability(false);
     }
   };
 
@@ -263,22 +777,132 @@ export const WorkerDashboardView: React.FC = () => {
     <div className="min-h-screen bg-[#FAFAFA] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
         
-        {/* Header Profile Card */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className="relative group">
-              <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-slate-100 border-2 border-slate-200 shrink-0">
-                <img
-                  src={formData.profilePhoto || currentWorker.profilePhoto}
-                  alt={currentWorker.firstName}
-                  className="w-full h-full object-cover"
-                />
+        {/* One-time ManyChat / WhatsApp claimed profile notification */}
+        {showManyChatBanner && (
+          <div 
+            id="manychat-claimed-banner"
+            className="bg-emerald-50 border border-emerald-200 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-start justify-between gap-4 animate-in fade-in duration-300"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <MessageCircle className="w-5 h-5" />
               </div>
-              <label className="absolute -bottom-1 -right-1 p-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-xs cursor-pointer transition-transform hover:scale-105">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-base font-bold text-emerald-950">¡Bienvenido a Maestro Cerca!</h4>
+                  <span className="text-[11px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Registro WhatsApp
+                  </span>
+                </div>
+                <p className="text-sm text-emerald-900 leading-relaxed font-medium">
+                  Ya agregamos la información que nos compartiste por WhatsApp. Revisa y completa tu perfil para que los clientes puedan conocerte mejor.
+                </p>
+              </div>
+            </div>
+            <button
+              id="dismiss-manychat-banner-btn"
+              onClick={handleDismissManyChatBanner}
+              className="self-end sm:self-start inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 hover:text-emerald-950 hover:bg-emerald-100/80 rounded-xl transition-colors shrink-0"
+              aria-label="Cerrar aviso de WhatsApp"
+              title="Entendido"
+            >
+              <span>Entendido</span>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* High-visibility Warning Banner for Unverified Phone */}
+        {!isTrulyPhoneVerified && (
+          <div 
+            id="dashboard-phone-unverified-alert" 
+            className="p-5 sm:p-6 bg-amber-50 border-2 border-amber-300 rounded-3xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-300"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-base font-black text-amber-950">Teléfono pendiente de verificar</h4>
+                  <span className="text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                    Perfil no visible en el directorio
+                  </span>
+                </div>
+                <p className="text-sm text-amber-900 leading-relaxed font-medium">
+                  Tu número de teléfono aún no ha sido validado por SMS. Tu perfil permanecerá con estatus <strong>Pendiente</strong> y no será visible para los clientes de Querétaro hasta que confirmes tu celular.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              id="dashboard-verify-phone-sms-btn"
+              onClick={() => {
+                setActiveTab('profile');
+                setShowPhoneLinkForm(true);
+                setTimeout(() => {
+                  document.getElementById('access-methods-section')?.scrollIntoView({
+                    behavior: 'smooth',
+                  });
+                }, 100);
+              }}
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
+            >
+              <Phone className="w-4 h-4" />
+              <span>VERIFICAR POR SMS</span>
+            </button>
+          </div>
+        )}
+
+        {/* Header Profile Card */}
+        <div id="section-profile-header" className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            {/* Interactive Avatar Component */}
+            <div className="relative group shrink-0">
+              <WorkerAvatar
+                worker={currentWorker}
+                allowPendingPreview={true}
+                previewUrl={pendingPhotoPreviewUrl}
+                alt={`${currentWorker.firstName} ${currentWorker.lastName}`}
+                size="md"
+                imgClassName="transition-transform duration-300 group-hover:scale-105"
+              >
+                {/* Uploading indicator overlay */}
+                {isUploadingProfilePhoto && (
+                  <div className="absolute inset-0 bg-slate-900/75 flex flex-col items-center justify-center text-white gap-1 p-2 z-20">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span className="text-[10px] font-bold">Subiendo...</span>
+                  </div>
+                )}
+
+                {/* Desktop hover overlay */}
+                {!isUploadingProfilePhoto && (
+                  <label 
+                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer p-1 text-center z-10"
+                    title="Cambiar foto de perfil (JPG, PNG, WebP máx. 5MB)"
+                  >
+                    <Camera className="w-5 h-5 mb-0.5" />
+                    <span className="text-[10px] font-bold leading-tight">Cambiar foto</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleProfilePhotoUpload}
+                      disabled={isUploadingProfilePhoto}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </WorkerAvatar>
+
+              {/* Accessible Camera badge on bottom-right corner */}
+              <label 
+                className="absolute -bottom-1.5 -right-1.5 p-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-md cursor-pointer transition-all hover:scale-110 active:scale-95 z-20 flex items-center justify-center"
+                title="Cambiar foto de perfil (JPG, PNG, WebP máx. 5MB)"
+              >
                 <Camera className="w-3.5 h-3.5" />
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   onChange={handleProfilePhotoUpload}
                   disabled={isUploadingProfilePhoto}
                   className="hidden"
@@ -286,25 +910,57 @@ export const WorkerDashboardView: React.FC = () => {
               </label>
             </div>
 
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <div className="space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-2">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
                   {currentWorker.firstName} {currentWorker.lastName}
                 </h1>
-                {isVerified ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                    <span>Verificado por Maestro Cerca</span>
+                <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border font-black text-xs sm:text-sm tracking-wide uppercase shadow-xs w-fit ${
+                  isVerified
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    : 'bg-slate-100 text-slate-800 border-slate-300'
+                }`}>
+                  <span className="text-[10px] sm:text-xs font-bold text-slate-500 tracking-normal normal-case">
+                    ESTATUS ACTUAL:
                   </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                    <span>Registrado</span>
+                  <span className="flex items-center gap-1.5 font-black">
+                    {isVerified ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>VERIFICADO</span>
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="w-4 h-4 text-slate-500 shrink-0" />
+                        <span>REGISTRADO</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <p className="text-sm sm:text-base font-bold text-orange-600">{currentWorker.mainTrade}</p>
+                {currentWorker.profilePhotoReviewStatus === 'pending' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold">
+                    <Clock className="w-3 h-3 text-amber-700" />
+                    Foto en moderación (se mostrará al aprobarse)
+                  </span>
+                )}
+                {currentWorker.profilePhotoReviewStatus === 'approved' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 text-xs font-bold">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                    Foto pública aprobada
+                  </span>
+                )}
+                {currentWorker.profilePhotoReviewStatus === 'rejected' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-200 text-xs font-bold">
+                    <AlertCircle className="w-3 h-3 text-rose-700" />
+                    Foto rechazada (sube otra)
                   </span>
                 )}
               </div>
-              <p className="text-sm font-bold text-orange-600">{currentWorker.mainTrade}</p>
-              <p className="text-xs text-slate-500 flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <p className="text-xs sm:text-sm text-slate-500 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>{currentWorker.serviceAreas.join(', ')}</span>
               </p>
             </div>
@@ -321,11 +977,123 @@ export const WorkerDashboardView: React.FC = () => {
           </div>
         </div>
 
+        {/* BOTÓN GRANDE Y BANNER DE DISPONIBILIDAD */}
+        <div 
+          id="worker-availability-card"
+          className={`p-5 rounded-3xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+            isAvailable 
+              ? 'bg-emerald-50/70 border-emerald-200' 
+              : 'bg-amber-50 border-amber-300'
+          }`}
+        >
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className={`w-3.5 h-3.5 rounded-full mt-1 sm:mt-0 shrink-0 ${isAvailable ? 'bg-emerald-500 shadow-xs' : 'bg-amber-500'}`} />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm sm:text-base font-black text-slate-900">
+                  {isAvailable ? 'Disponible para nuevos trabajos' : 'Tu disponibilidad está pausada'}
+                </span>
+                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                  isAvailable ? 'bg-emerald-200/80 text-emerald-900' : 'bg-amber-200 text-amber-900'
+                }`}>
+                  {isAvailable ? 'Activo en búsquedas' : 'Oculto en búsquedas'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5 max-w-xl">
+                {isAvailable 
+                  ? 'Los clientes en Querétaro pueden encontrar tu perfil y contactarte directamente por WhatsApp o llamada.' 
+                  : 'Tu perfil dejará temporalmente de aparecer como disponible para nuevos clientes. Podrás volver a activarlo cuando quieras.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="w-full sm:w-auto shrink-0">
+            {isAvailable ? (
+              <button
+                type="button"
+                id="pause-availability-btn"
+                onClick={() => setShowAvailabilityModal(true)}
+                className="w-full sm:w-auto py-3 px-5 bg-white hover:bg-slate-100 active:scale-[0.99] border border-slate-300 text-slate-700 hover:text-slate-900 font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <PauseCircle className="w-4 h-4 text-slate-500" />
+                <span>Pausar mi disponibilidad</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                id="resume-availability-btn"
+                disabled={isTogglingAvailability}
+                onClick={handleToggleAvailability}
+                className="w-full sm:w-auto py-3 px-6 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isTogglingAvailability ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Activando...</span>
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle className="w-4 h-4" />
+                    <span>Volver a estar disponible</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Modal de confirmación para pausar disponibilidad */}
+        {showAvailabilityModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+              <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center mx-auto">
+                <PauseCircle className="w-6 h-6" />
+              </div>
+              
+              <div className="text-center space-y-2">
+                <h3 className="text-lg font-black text-slate-900">
+                  ¿Pausar tu disponibilidad?
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Tu perfil dejará temporalmente de aparecer como disponible para nuevos clientes. Podrás volver a activarlo cuando quieras.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                <button
+                  type="button"
+                  id="confirm-pause-availability-btn"
+                  disabled={isTogglingAvailability}
+                  onClick={handleToggleAvailability}
+                  className="flex-1 py-3 px-4 bg-amber-600 hover:bg-amber-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isTogglingAvailability ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <span>Pausar disponibilidad</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  disabled={isTogglingAvailability}
+                  onClick={() => setShowAvailabilityModal(false)}
+                  className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Global Notifications */}
         {saveSuccess && (
           <div className="p-4 bg-green-50 border border-green-200 text-green-800 text-sm rounded-2xl flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
-            <span>Los cambios han sido guardados exitosamente en Firestore.</span>
+            <span>Los cambios han sido guardados exitosamente.</span>
           </div>
         )}
         {saveError && (
@@ -356,7 +1124,7 @@ export const WorkerDashboardView: React.FC = () => {
           )}
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs (3 tabs strictly) */}
         <div className="flex overflow-x-auto gap-2 border-b border-slate-200 pb-2">
           <button
             onClick={() => setActiveTab('profile')}
@@ -369,16 +1137,6 @@ export const WorkerDashboardView: React.FC = () => {
             Mi perfil
           </button>
           <button
-            onClick={() => setActiveTab('services')}
-            className={`py-2 px-4 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-colors cursor-pointer ${
-              activeTab === 'services'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
-            }`}
-          >
-            Servicios ({formData.services.length})
-          </button>
-          <button
             onClick={() => setActiveTab('photos')}
             className={`py-2 px-4 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-colors cursor-pointer ${
               activeTab === 'photos'
@@ -386,18 +1144,7 @@ export const WorkerDashboardView: React.FC = () => {
                 : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
             }`}
           >
-            Galería de fotos ({currentWorker.workPhotos?.length || 0})
-          </button>
-          <button
-            onClick={() => setActiveTab('verification')}
-            className={`py-2 px-4 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'verification'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4 text-green-600" />
-            <span>Verificación</span>
+            Galería de fotos ({portfolioPhotos.length})
           </button>
           <button
             onClick={() => setActiveTab('stats')}
@@ -413,11 +1160,177 @@ export const WorkerDashboardView: React.FC = () => {
 
         {/* TAB 1: MI PERFIL */}
         {activeTab === 'profile' && (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Información básica del trabajador</h2>
-                <p className="text-xs text-slate-500">Mantén tus datos actualizados para que los clientes puedan llamarte.</p>
+          <div className="space-y-6">
+
+            {/* SECCIÓN INTEGRADA DE VERIFICACIÓN Y CONFIANZA */}
+            <div id="verification-summary-section" className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                        Verificación y confianza
+                      </h2>
+                      <p className="text-xs text-slate-500">
+                        {isVerified 
+                          ? 'Tu perfil cuenta con la insignia de confianza oficial de Maestro Cerca.' 
+                          : 'Requisitos para obtener la insignia de Verificado por Maestro Cerca.'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`text-[11px] font-black uppercase px-3 py-1 rounded-full border ${
+                    isVerified 
+                      ? 'bg-emerald-100 text-emerald-900 border-emerald-300' 
+                      : 'bg-slate-100 text-slate-700 border-slate-200'
+                  }`}>
+                    Estatus: {isVerified ? 'Verificado' : 'Registrado'}
+                  </span>
+                </div>
+
+                {/* Beneficio destacado */}
+                <div className="p-4 rounded-2xl bg-orange-50/80 border border-orange-200/90 text-orange-950">
+                  <p className="text-xs sm:text-sm text-orange-950 leading-relaxed font-medium">
+                    ✨ <strong>Un perfil verificado genera mayor confianza y puede aumentar tus contactos.</strong>
+                  </p>
+                </div>
+              </div>
+
+              {isVerified ? (
+                <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 space-y-2">
+                  <div className="flex items-center gap-2 font-black text-sm sm:text-base">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <span>Tu perfil ya cuenta con verificación oficial en Maestro Cerca</span>
+                  </div>
+                  <p className="text-xs text-emerald-800 leading-relaxed pl-7">
+                    Tu identidad, número telefónico y fotografías de trabajos han sido revisados y validados por el equipo administrativo.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Radial circular progress with requirements list */}
+                  <VerificationRadialProgress
+                    completedCount={completedVerificationCount}
+                    totalCount={totalVerificationCount}
+                    items={verificationItems}
+                    onNavigateTab={(tab, anchorId) => {
+                      setActiveTab(tab);
+                      if (anchorId) {
+                        setTimeout(() => {
+                          const el = document.getElementById(anchorId);
+                          if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }
+                        }, 100);
+                      }
+                    }}
+                  />
+
+                  {/* Estado: Solicitud en revisión */}
+                  {(verifSubmitted || currentWorker.tieneVerificacionPendiente || currentWorker.verificationRequest?.status === 'pending') ? (
+                    <div className="p-5 rounded-2xl bg-slate-100 border border-slate-200 text-slate-800 space-y-2">
+                      <div className="flex items-center gap-2 font-black text-sm text-slate-900">
+                        <Clock className="w-5 h-5 text-orange-600 shrink-0" />
+                        <span>Solicitud en revisión</span>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Hemos recibido tus datos y comprobantes de respaldo. El equipo de administración revisará la información de tu perfil para validar tu insignia de <strong>"Verificado por Maestro Cerca"</strong>.
+                      </p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleVerificationSubmit} className="space-y-4 pt-1">
+                      {/* Optional Documents / Technical diplomas */}
+                      <div className="space-y-2 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                        <div>
+                          <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">
+                            Comprobante técnico, diploma o certificado <span className="text-slate-400 font-normal lowercase">(opcional)</span>
+                          </h4>
+                          <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                            Sube diplomas de cursos, certificaciones técnicas (por ejemplo CONOCER, gasista, electricista) o reconocimientos de oficio si cuentas con ellos.
+                          </p>
+                        </div>
+                        <div className="space-y-2 pt-1">
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const check = validateVerificationDoc(file, 10);
+                                if (!check.valid) {
+                                  alert(check.error);
+                                  return;
+                                }
+                                setVerifDocFile(file);
+                                setVerifDocName(file.name);
+                              }
+                            }}
+                            className="w-full text-xs text-slate-600 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-900 file:text-white hover:file:bg-black cursor-pointer"
+                          />
+                          {verifDocFile && (
+                            <div className="text-xs text-emerald-700 font-bold flex items-center gap-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span>Archivo adjunto: {verifDocFile.name} ({(verifDocFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Optional Notes for Reviewer */}
+                      <div className="space-y-2 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                        <label className="block text-xs font-black uppercase text-slate-800 tracking-wide">
+                          Notas adicionales para el revisor <span className="text-slate-400 font-normal lowercase">(opcional)</span>
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={verifNotes}
+                          onChange={(e) => setVerifNotes(e.target.value)}
+                          placeholder="Ejemplo: Realizo instalaciones residenciales y comerciales en Querétaro desde hace 8 años."
+                          className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-hidden transition-all"
+                        />
+                      </div>
+
+                      {/* Botón: Solicitar revisión para verificarme */}
+                      <div className="pt-2 space-y-2.5">
+                        <button
+                          type="submit"
+                          disabled={!allVerificationRequirementsMet || isSubmittingVerif}
+                          className="w-full py-3.5 px-6 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          {isSubmittingVerif ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Enviando solicitud...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="w-5 h-5 shrink-0" />
+                              <span>Solicitar revisión para verificarme</span>
+                            </>
+                          )}
+                        </button>
+
+                        {!allVerificationRequirementsMet && (
+                          <p className="text-center text-xs font-bold text-amber-800 bg-amber-50 py-2.5 px-4 rounded-xl border border-amber-200">
+                            Completa los requisitos obligatorios antes de solicitar revisión.
+                          </p>
+                        )}
+                      </div>
+                    </form>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* INFORMACIÓN DEL PERFIL */}
+            <div id="section-basic-info" className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Información básica del trabajador</h2>
+                  <p className="text-xs text-slate-500">Mantén tus datos actualizados para que los clientes puedan llamarte.</p>
+                </div>
               </div>
             </div>
 
@@ -447,10 +1360,29 @@ export const WorkerDashboardView: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-bold uppercase text-slate-700">Teléfono celular</label>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      <span>Autenticado por SMS</span>
-                    </span>
+                    {isTrulyPhoneVerified ? (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>SMS confirmado</span>
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 text-amber-600" />
+                          <span>No verificado por SMS</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            document.getElementById('access-methods-section')?.scrollIntoView({ behavior: 'smooth' });
+                            setShowPhoneLinkForm(true);
+                          }}
+                          className="text-[10px] font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
+                        >
+                          Verificar
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <input
                     type="text"
@@ -459,7 +1391,9 @@ export const WorkerDashboardView: React.FC = () => {
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium"
                   />
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Número principal con el que inicias sesión y recibes llamadas.
+                    {isTrulyPhoneVerified 
+                      ? 'Número autenticado por SMS. Si cambias este número, deberás validarlo de nuevo por SMS para conservar la verificación.'
+                      : 'Número de contacto. Para que aparezca como verificado ante los clientes, debes validarlo con SMS en Métodos de Acceso.'}
                   </p>
                 </div>
                 <div>
@@ -518,6 +1452,98 @@ export const WorkerDashboardView: React.FC = () => {
                 </div>
               </div>
 
+              {/* SERVICIOS ESPECÍFICOS QUE REALIZAS (INTEGRADO EN MI PERFIL) */}
+              <div id="worker-services-section" className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <label className="block text-xs font-black uppercase text-slate-900 tracking-wide">
+                      Trabajos y servicios que realizas ({formData.services.length})
+                    </label>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Agrega tareas específicas para que los clientes te encuentren en las búsquedas (ej. "Instalación de tinaco", "Reparación de fugas", "Aplanados").
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-bold text-orange-700 bg-orange-100/80 px-2 py-0.5 rounded-md">
+                    Mínimo 2 recomendados
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Escribe un servicio y presiona Enter o Agregar..."
+                    value={newService}
+                    onChange={(e) => setNewService(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddServiceItem();
+                      }
+                    }}
+                    className="flex-1 p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-orange-500 outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddServiceItem}
+                    className="px-4 py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-black flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Agregar</span>
+                  </button>
+                </div>
+
+                {/* Quick suggestions based on main trade */}
+                {TRADE_SERVICE_SUGGESTIONS[formData.mainTrade] && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Sugerencias para {formData.mainTrade} (toca para agregar):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {TRADE_SERVICE_SUGGESTIONS[formData.mainTrade]
+                        .filter(sug => !formData.services.includes(sug))
+                        .slice(0, 6)
+                        .map((sug, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleAddSuggestedService(sug)}
+                            className="text-xs py-1 px-2.5 rounded-lg bg-white hover:bg-orange-50 border border-slate-200 hover:border-orange-300 text-slate-700 hover:text-orange-700 font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3 text-orange-500" />
+                            <span>{sug}</span>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {formData.services.length === 0 ? (
+                  <p className="text-xs text-amber-800 italic bg-amber-50 p-3 rounded-xl border border-amber-200">
+                    Aún no has registrado servicios específicos. Los clientes suelen decidir contactar basándose en las tareas que puedes realizar.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {formData.services.map((srv, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-2 py-1.5 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 shadow-2xs group hover:border-slate-300 transition-colors"
+                      >
+                        <span>{srv}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveServiceItem(idx)}
+                          className="p-0.5 text-slate-400 hover:text-red-600 rounded-md transition-colors cursor-pointer"
+                          title={`Eliminar ${srv}`}
+                          aria-label={`Eliminar servicio ${srv}`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Descripción pública</label>
                 <textarea
@@ -564,7 +1590,7 @@ export const WorkerDashboardView: React.FC = () => {
                   {isSaving ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Guardando en Firestore...</span>
+                      <span>Actualizando tu perfil...</span>
                     </>
                   ) : (
                     <>
@@ -575,72 +1601,247 @@ export const WorkerDashboardView: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
-        )}
 
-        {/* TAB 2: MIS SERVICIOS */}
-        {activeTab === 'services' && (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">Servicios específicos que realizas</h2>
-              <p className="text-xs text-slate-500">Agrega o elimina los tipos de trabajos que los clientes pueden solicitarte.</p>
-            </div>
+            {/* SECCIÓN MÉTODOS DE ACCESO (Account Linking) */}
+            <div id="access-methods-section" className="mt-8 pt-6 border-t border-slate-200 space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-orange-600" />
+                  <span>Métodos de acceso</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Puedes vincular diferentes formas de iniciar sesión a tu misma cuenta de Maestro Cerca.
+                </p>
+              </div>
 
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Ej. Reparación de fugas, Instalación de calentador..."
-                value={newService}
-                onChange={(e) => setNewService(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddServiceItem();
-                  }
-                }}
-                className="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium"
-              />
-              <button
-                type="button"
-                onClick={handleAddServiceItem}
-                className="px-5 py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-black flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Agregar</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-              {formData.services.map((srv, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-sm text-slate-800"
-                >
-                  <span className="font-medium">{srv}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveServiceItem(idx)}
-                    className="p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+              {/* Feedback Alerts */}
+              {linkingError && (
+                <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-800 flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed font-medium">{linkingError}</span>
                 </div>
-              ))}
+              )}
+              {linkingSuccess && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed font-medium">{linkingSuccess}</span>
+                </div>
+              )}
+
+              {/* Invisible reCAPTCHA container for Phone Linking */}
+              <div id="link-phone-recaptcha-container" />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* 1. Teléfono */}
+                <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex flex-col justify-between gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-700">
+                        <Phone className="w-4 h-4" />
+                      </div>
+                      <span className="text-sm font-bold text-slate-900">Teléfono</span>
+                    </div>
+                    {isPhoneLinked ? (
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Vinculado</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-medium text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded-full">
+                        No vinculado
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    {isPhoneLinked ? (
+                      <p className="text-xs font-mono text-slate-700 font-semibold tracking-wide">
+                        {formatMaskedPhone(phoneValue)}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-500">
+                        Recibe llamadas e inicia sesión por SMS.
+                      </p>
+                    )}
+                  </div>
+
+                  {!isPhoneLinked && (
+                    <div>
+                      {!showPhoneLinkForm ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowPhoneLinkForm(true)}
+                          className="w-full py-2 px-3 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 text-xs font-bold rounded-xl shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Vincular teléfono
+                        </button>
+                      ) : (
+                        <div className="space-y-2 pt-2 border-t border-slate-200">
+                          {!linkConfirmationResult ? (
+                            <form onSubmit={handleSendPhoneLinkSms} className="space-y-2">
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">+52</span>
+                                <input
+                                  type="tel"
+                                  maxLength={10}
+                                  value={linkPhoneDigits}
+                                  onChange={(e) => setLinkPhoneDigits(e.target.value.replace(/\D/g, ''))}
+                                  placeholder="10 dígitos cel"
+                                  className="w-full pl-10 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium"
+                                />
+                              </div>
+                              <div className="flex gap-1.5">
+                                <button
+                                  type="submit"
+                                  disabled={isSendingPhoneSms || linkPhoneDigits.length !== 10}
+                                  className="flex-1 py-1.5 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                                >
+                                  {isSendingPhoneSms ? 'Enviando...' : 'Enviar SMS'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPhoneLinkForm(false)}
+                                  className="py-1.5 px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg cursor-pointer"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </form>
+                          ) : (
+                            <form onSubmit={handleConfirmPhoneLink} className="space-y-2">
+                              <input
+                                type="text"
+                                maxLength={6}
+                                value={linkSmsCode}
+                                onChange={(e) => setLinkSmsCode(e.target.value.replace(/\D/g, ''))}
+                                placeholder="Código de 6 dígitos"
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium text-center tracking-widest"
+                              />
+                              <div className="flex gap-1.5">
+                                <button
+                                  type="submit"
+                                  disabled={isConfirmingPhoneSms || linkSmsCode.length < 6}
+                                  className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                                >
+                                  {isConfirmingPhoneSms ? 'Verificando...' : 'Confirmar'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setLinkConfirmationResult(null);
+                                    setLinkSmsCode('');
+                                  }}
+                                  className="py-1.5 px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg cursor-pointer"
+                                >
+                                  Atrás
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Facebook */}
+                <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex flex-col justify-between gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#1877F2">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-bold text-slate-900">Facebook</span>
+                    </div>
+                    {isFacebookLinked ? (
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Vinculado</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-medium text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded-full">
+                        No vinculado
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    {isFacebookLinked ? (
+                      <p className="text-xs text-slate-700 font-medium truncate">
+                        {facebookDisplayName || 'Cuenta vinculada'}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-500">
+                        Accede con tu perfil de Facebook.
+                      </p>
+                    )}
+                  </div>
+
+                  {!isFacebookLinked && (
+                    <button
+                      type="button"
+                      disabled={isLinkingFacebook}
+                      onClick={handleLinkFacebook}
+                      className="w-full py-2 px-3 bg-white hover:bg-slate-100 disabled:bg-slate-100 border border-slate-300 text-slate-800 text-xs font-bold rounded-xl shadow-2xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isLinkingFacebook ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />
+                          <span>Vinculando...</span>
+                        </>
+                      ) : (
+                        <span>Vincular Facebook</span>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 italic pt-1">
+                Vincular varios métodos te permite entrar a la misma cuenta de Maestro Cerca de diferentes formas.
+              </p>
+            </div>
+
+            {/* Danger Zone: Account Deletion */}
+            <div className="mt-8 pt-6 border-t border-red-100">
+              <div className="p-5 rounded-2xl bg-red-50/60 border border-red-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-red-950 flex items-center gap-2">
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                    <span>Eliminar mi cuenta de Maestro</span>
+                  </h3>
+                  <p className="text-xs text-red-800/80 mt-1 max-w-xl leading-relaxed">
+                    Si ya no deseas ofrecer tus servicios o deseas retirar tu ficha del directorio de Maestro Cerca, puedes darte de baja definitivamente.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteAccountError('');
+                    setShowDeleteModal(true);
+                  }}
+                  className="py-2.5 px-4 bg-white hover:bg-red-600 hover:text-white text-red-700 border border-red-300 font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
+                >
+                  Eliminar mi cuenta
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* TAB 3: GALERÍA DE TRABAJOS (FIREBASE STORAGE UPLOADER) */}
+        {/* TAB 2: GALERÍA DE TRABAJOS */}
         {activeTab === 'photos' && (
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Fotografías de trabajos realizados</h2>
-              <p className="text-xs text-slate-500">Sube fotos de tus proyectos para almacenar de forma segura en Firebase Storage.</p>
+              <p className="text-xs text-slate-500">Sube fotos de tus proyectos y obras para enriquecer tu portafolio público.</p>
             </div>
 
-            {/* Upload form to Firebase Storage */}
+            {/* Upload form with Drag and Drop */}
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-              <p className="text-xs font-bold uppercase text-slate-700">Subir nueva fotografía a tu portafolio:</p>
+              <p className="text-xs font-bold uppercase text-slate-700">Subir fotografías a tu portafolio:</p>
 
               <p className="text-[11px] text-slate-500 leading-relaxed italic bg-white p-3 rounded-xl border border-slate-200">
                 Al subir fotografías confirmas que cuentas con autorización para compartirlas y que procurarás no incluir documentos, teléfonos, domicilios u otros datos personales de terceros.
@@ -649,196 +1850,113 @@ export const WorkerDashboardView: React.FC = () => {
               <div className="space-y-3">
                 <input
                   type="text"
-                  placeholder="Título breve del trabajo (ej. Instalación de cocina integral)"
+                  placeholder="Título breve del trabajo (opcional, ej. Instalación de cocina integral)"
                   value={newPhotoTitle}
                   onChange={(e) => setNewPhotoTitle(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium"
                 />
 
-                <div className="flex items-center gap-3">
-                  <label className="cursor-pointer inline-flex items-center gap-2 py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors">
-                    <Upload className="w-4 h-4" />
-                    <span>Seleccionar imagen y subir</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingPhoto}
-                      onChange={handleAddWorkPhotoFile}
-                      className="hidden"
-                    />
-                  </label>
-                  {isUploadingPhoto && (
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
-                      <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
-                      <span>Subiendo a Firebase Storage...</span>
+                {/* Drag and Drop Zone */}
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDraggingPhotos(true);
+                  }}
+                  onDragLeave={() => setIsDraggingPhotos(false)}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    setIsDraggingPhotos(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                      await processAndUploadWorkPhotos(e.dataTransfer.files);
+                    }
+                  }}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
+                    isDraggingPhotos 
+                      ? 'border-orange-500 bg-orange-50/50' 
+                      : 'border-slate-300 bg-white hover:border-slate-400'
+                  }`}
+                >
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                      <Upload className="w-5 h-5" />
                     </div>
-                  )}
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">
+                        Arrastra tus fotos aquí o haz clic para seleccionar
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Puedes seleccionar múltiples imágenes a la vez (JPG, PNG, WebP máx. 5MB)
+                      </p>
+                    </div>
+
+                    <label className="cursor-pointer mt-2 inline-flex items-center gap-2 py-2 px-4 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors">
+                      <Plus className="w-4 h-4" />
+                      <span>Seleccionar archivos</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        disabled={isUploadingPhoto}
+                        onChange={handleWorkPhotosFileInput}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {isUploadingPhoto && (
+                      <div className="flex items-center gap-2 text-xs text-orange-700 font-medium mt-3 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-200">
+                        <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
+                        <span>
+                          {uploadProgress 
+                            ? `Subiendo imagen ${uploadProgress.current} de ${uploadProgress.total}...` 
+                            : 'Subiendo fotografías...'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-[11px] text-slate-500">Límite de 5MB por imagen. Formatos soportados: JPG, PNG, WebP.</p>
               </div>
             </div>
 
             {/* Current Photos Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2">
-              {currentWorker.workPhotos?.map((photo) => (
-                <div key={photo.id} className="relative group rounded-2xl overflow-hidden border border-slate-200 aspect-4/3">
-                  <img src={photo.url} alt={photo.title} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-between text-white">
-                    <p className="text-xs font-bold">{photo.title}</p>
-                    <button
-                      type="button"
-                      onClick={() => removeWorkerPhoto(currentWorker.id, photo.id)}
-                      className="self-end p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs flex items-center gap-1 cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Eliminar</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: VERIFICACIÓN */}
-        {activeTab === 'verification' && (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-            
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-700 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-6 h-6" />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Galería actual ({portfolioPhotos.length} fotos)
+                </span>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">
-                  Verifica tu perfil en Maestro Cerca
-                </h2>
-                <p className="text-slate-600 text-sm mt-0.5">
-                  Los perfiles verificados aparecen primero en las búsquedas y generan mayor confianza en los clientes de Querétaro.
-                </p>
-              </div>
-            </div>
 
-            {isVerified ? (
-              <div className="p-5 rounded-2xl bg-green-50 border border-green-200 text-green-900 space-y-2">
-                <div className="flex items-center gap-2 font-bold text-base">
-                  <CheckCircle2 className="w-5 h-5 text-green-700" />
-                  <span>Tu perfil ya está Verificado por Maestro Cerca</span>
+              {portfolioPhotos.length === 0 ? (
+                <div className="text-center py-10 border border-slate-200 rounded-2xl bg-slate-50/50 p-6">
+                  <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-slate-700">Aún no tienes fotografías en tu portafolio</p>
+                  <p className="text-xs text-slate-500 mt-1">Sube imágenes de trabajos realizados para que los clientes aprecien la calidad de tu oficio.</p>
                 </div>
-                <p className="text-xs text-green-800">
-                  Tus documentos, referencias y fotografías han sido aprobados manualmente por el equipo de administración.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                
-                {/* Status card */}
-                <div className="p-4 rounded-2xl bg-orange-50 border border-orange-200 text-orange-900 text-xs leading-relaxed space-y-1">
-                  <p className="font-bold">Estatus actual: Registrado en Maestro Cerca</p>
-                  <p>
-                    Para obtener el distintivo <strong>"Verificado por Maestro Cerca"</strong>, envía tu información para que el equipo administrativo la revise de manera segura.
-                  </p>
-                </div>
-
-                {verifSubmitted || currentWorker.verificationRequest ? (
-                  <div className="p-5 rounded-2xl bg-slate-100 border border-slate-200 text-slate-800 space-y-2">
-                    <p className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-orange-600" />
-                      <span>Solicitud de verificación en revisión</span>
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      Hemos recibido tus referencias y documentos. El equipo de administración revisará la información para verificar tu identidad y antecedentes.
-                    </p>
-                  </div>
-                ) : (
-                  <form onSubmit={handleVerificationSubmit} className="space-y-4 pt-2">
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                        1. Identificación oficial (INE o pasaporte)
-                      </label>
-                      <div className="space-y-2">
-                        <input
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const check = validateVerificationDoc(file, 10);
-                              if (!check.valid) {
-                                alert(check.error);
-                                return;
-                              }
-                              setVerifDocFile(file);
-                              setVerifDocName(file.name);
-                            }
-                          }}
-                          className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-black cursor-pointer"
-                        />
-                        {verifDocFile && (
-                          <div className="text-xs text-emerald-600 font-medium">
-                            Archivo adjunto: {verifDocFile.name} ({(verifDocFile.size / 1024 / 1024).toFixed(2)} MB)
-                          </div>
-                        )}
-                        <p className="text-[11px] text-slate-500">
-                          Se guarda de forma privada y encriptada en Firebase Storage (solo visible para auditores y administradores).
-                        </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2">
+                  {portfolioPhotos.map((photo) => (
+                    <div key={photo.id} className="relative group rounded-2xl overflow-hidden border border-slate-200 aspect-4/3 bg-slate-100 shadow-2xs">
+                      <img src={photo.url} alt={photo.title} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-between text-white">
+                        <p className="text-xs font-bold line-clamp-2">{photo.title}</p>
+                        <button
+                          type="button"
+                          onClick={() => setPhotoToDelete(photo)}
+                          className="self-end p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                          title="Eliminar fotografía"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Eliminar</span>
+                        </button>
                       </div>
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                        2. Referencias de clientes o arquitectos en Querétaro
-                      </label>
-                      <textarea
-                        rows={3}
-                        required
-                        value={verifReferences}
-                        onChange={(e) => setVerifReferences(e.target.value)}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium"
-                      />
-                      <p className="text-[11px] text-slate-500 mt-1">Incluye nombre y teléfono de 2 personas que recomienden tu trabajo.</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                        3. Notas adicionales para el revisor
-                      </label>
-                      <input
-                        type="text"
-                        value={verifNotes}
-                        onChange={(e) => setVerifNotes(e.target.value)}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium"
-                      />
-                    </div>
-
-                    <div className="pt-2">
-                      <button
-                        type="submit"
-                        disabled={isSubmittingVerif}
-                        className="w-full sm:w-auto py-3 px-6 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-bold text-sm rounded-xl shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                      >
-                        {isSubmittingVerif ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Enviando documentos a almacenamiento seguro...</span>
-                          </>
-                        ) : (
-                          <>
-                            <ShieldCheck className="w-4 h-4" />
-                            <span>Enviar solicitud de verificación</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-              </div>
-            )}
-
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* TAB 5: ESTADÍSTICAS */}
+        {/* TAB 3: ESTADÍSTICAS */}
         {activeTab === 'stats' && (
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
             <div>
@@ -878,6 +1996,107 @@ export const WorkerDashboardView: React.FC = () => {
         )}
 
       </div>
+
+      {/* Confirmation Modal for Photo Deletion */}
+      {photoToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-11 h-11 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
+              <Trash2 className="w-5 h-5" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-slate-900">¿Eliminar esta fotografía?</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                La fotografía seleccionada ya no se mostrará en tu portafolio público.
+              </p>
+            </div>
+
+            <div className="rounded-xl overflow-hidden aspect-16/9 bg-slate-100 border border-slate-200">
+              <img src={photoToDelete.url} alt={photoToDelete.title} className="w-full h-full object-cover" />
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                disabled={isDeletingPhoto}
+                onClick={() => setPhotoToDelete(null)}
+                className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingPhoto}
+                onClick={handleConfirmDeletePhoto}
+                className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {isDeletingPhoto ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <span>Eliminar foto</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Account Deletion */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-red-100 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-700 flex items-center justify-center">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-lg font-black text-slate-900">¿Seguro que quieres eliminar tu cuenta?</h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Tu perfil dejará de estar disponible en Maestro Cerca y perderás el acceso a esta cuenta.
+              </p>
+            </div>
+
+            {deleteAccountError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+                {deleteAccountError}
+              </div>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row items-center gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingAccount}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteAccountError('');
+                }}
+                className="w-full sm:w-1/2 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingAccount}
+                onClick={handleDeleteAccount}
+                className="w-full sm:w-1/2 py-3 px-4 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isDeletingAccount ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <span>Eliminar mi cuenta definitivamente</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

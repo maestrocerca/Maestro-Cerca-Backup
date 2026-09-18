@@ -52,3 +52,26 @@ export function checkRateLimit(actionKey: string, cooldownMs: number = 2000): bo
   return true; // Allowed
 }
 
+/**
+ * Strips all undefined fields from an object or nested structure to prevent Firestore
+ * "Unsupported field value: undefined" errors.
+ */
+export function removeUndefinedFields<T extends Record<string, any>>(obj: T): T {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map((item) => (item && typeof item === 'object' ? removeUndefinedFields(item) : item)) as unknown as T;
+  }
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value && typeof value === 'object' && !(value instanceof Date)) {
+        result[key] = removeUndefinedFields(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result as T;
+}
+
+

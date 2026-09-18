@@ -5,20 +5,38 @@ import {
   CheckCircle2, 
   AlertCircle, 
   ShieldCheck, 
-  RotateCcw, 
-  ArrowLeft,
-  KeyRound,
-  Sparkles
+  RotateCcw
 } from 'lucide-react';
 import { ConfirmationResult } from 'firebase/auth';
 import { useStore, formatMexicanPhoneToE164, formatPhoneForDisplay } from '../context/StoreContext';
+import loginHeaderImage from '../assets/images/regenerated_image_1789689228307.png';
+
+const FacebookIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5 shrink-0" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+  </svg>
+);
 
 export const WorkerLoginView: React.FC = () => {
   const { 
     sendPhoneVerificationCode, 
-    confirmPhoneVerificationCode, 
-    navigateTo 
+    confirmPhoneVerificationCode,
+    loginWorkerWithFacebook,
+    logoutWorker,
+    showToast,
+    navigateTo,
+    isAdmin
   } = useStore();
+
+  useEffect(() => {
+    if (isAdmin) {
+      navigateTo({ type: 'admin' });
+    }
+  }, [isAdmin, navigateTo]);
+
+  if (isAdmin) {
+    return null;
+  }
 
   // Step 1: Phone input, Step 2: Code input
   const [step, setStep] = useState<1 | 2>(1);
@@ -29,7 +47,9 @@ export const WorkerLoginView: React.FC = () => {
   
   // Status states
   const [error, setError] = useState('');
+  const [nonExistentAccount, setNonExistentAccount] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFacebookLoading, setIsFacebookLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   
   // Resend countdown timer
@@ -50,9 +70,44 @@ export const WorkerLoginView: React.FC = () => {
   // Clean 10 digits only
   const cleanPhoneDigits = rawPhone.replace(/\D/g, '').slice(0, 10);
 
+  const handleFacebookSignIn = async () => {
+    setError('');
+    setNonExistentAccount(false);
+    setIsFacebookLoading(true);
+    try {
+      const res = await loginWorkerWithFacebook();
+      if (res.success) {
+        if (isAdmin) {
+          navigateTo({ type: 'admin' });
+          return;
+        }
+        if (res.hasExistingProfile) {
+          navigateTo({ type: 'dashboard' });
+        } else {
+          // Safety guard: login must strictly require an existing active profile
+          await logoutWorker();
+          setNonExistentAccount(true);
+          setError('No encontramos una cuenta de trabajador vinculada a este Facebook. Por favor regístrate primero.');
+        }
+      } else if (res.error) {
+        console.log('[Facebook Sign-In Error in View]:', res.error);
+        setError(res.error);
+        if (res.error.toLowerCase().includes('no encontramos') || res.error.toLowerCase().includes('regístrate')) {
+          setNonExistentAccount(true);
+        }
+      }
+    } catch (err: any) {
+      console.error('[Facebook Sign-In Exception in View]:', err?.code, err?.message, err);
+      setError(err?.message || 'Error al iniciar sesión con Facebook.');
+    } finally {
+      setIsFacebookLoading(false);
+    }
+  };
+
   const handleSendSms = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError('');
+    setNonExistentAccount(false);
 
     if (cleanPhoneDigits.length !== 10) {
       setError('Por favor ingresa los 10 dígitos de tu número celular.');
@@ -63,6 +118,34 @@ export const WorkerLoginView: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // 1. Backend-First verification: verify if worker profile exists BEFORE sending SMS
+      const checkRes = await fetch('/api/auth/phone-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          phone: formattedE164,
+          intent: 'login',
+        }),
+      });
+
+      const checkData = await checkRes.json().catch(() => ({}));
+
+      if (!checkRes.ok || !checkData.success) {
+        setError(checkData.error || 'No se pudo verificar el número telefónico. Intenta de nuevo.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check strictly state === "linked" AND hasProfile === true
+      // If either is false: DO NOT send SMS, DO NOT trigger reCAPTCHA, DO NOT create ghost Auth users!
+      if (checkData.state !== 'linked' || !checkData.hasProfile) {
+        setIsLoading(false);
+        setNonExistentAccount(true);
+        setError('Teléfono no vinculado a un usuario');
+        return;
+      }
+
+      // 2. Profile confirmed in database -> Send SMS verification code
       const res = await sendPhoneVerificationCode(formattedE164, 'recaptcha-login-container');
       if (res.success && res.confirmationResult) {
         setConfirmationResult(res.confirmationResult);
@@ -73,7 +156,7 @@ export const WorkerLoginView: React.FC = () => {
         setError(res.error || 'No pudimos enviar el código SMS. Intenta nuevamente.');
       }
     } catch (err: any) {
-      setError(err?.message || 'Error de conexión al enviar el código.');
+      setError(err?.message || 'Error de conexión al verificar el número.');
     } finally {
       setIsLoading(false);
     }
@@ -100,12 +183,21 @@ export const WorkerLoginView: React.FC = () => {
     try {
       const res = await confirmPhoneVerificationCode(confirmationResult, cleanCode);
       if (res.success) {
+        if (isAdmin) {
+          navigateTo({ type: 'admin' });
+          return;
+        }
         if (res.hasExistingProfile) {
-          // Worker already has a completed profile in Firestore -> go directly to Dashboard
+          // Worker has completed profile in Firestore -> go directly to Dashboard
           navigateTo({ type: 'dashboard' });
         } else {
-          // Authenticated but profile is not completed yet -> go directly to Register onboarding
-          navigateTo({ type: 'register' });
+          // CRITICAL: This is the LOGIN view, NOT registration.
+          // If no existing profile is found, do NOT navigate to register.
+          // Sign out immediately, return to step 1 and display clear notice.
+          await logoutWorker();
+          setStep(1);
+          setNonExistentAccount(true);
+          setError('No encontramos un perfil de trabajador activo asociado a este número. Por favor regístrate como trabajador.');
         }
       } else {
         setError(res.error || 'Código incorrecto. Revisa el SMS e intenta de nuevo.');
@@ -128,14 +220,18 @@ export const WorkerLoginView: React.FC = () => {
         
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 bg-orange-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-xs">
-            <Phone className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto shadow-xs overflow-hidden">
+            <img 
+              src={loginHeaderImage} 
+              alt="Maestro Cerca" 
+              className="w-full h-full object-cover"
+            />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             Acceso para trabajadores
           </h1>
           <p className="text-slate-600 text-sm">
-            Ingresa rápidamente con tu número celular mediante código SMS de seguridad.
+            Entra a tu cuenta con cualquiera de los métodos que tengas vinculados.
           </p>
         </div>
 
@@ -150,59 +246,126 @@ export const WorkerLoginView: React.FC = () => {
             </div>
           )}
 
-          {/* STEP 1: Phone number input */}
-          {step === 1 && (
-            <form onSubmit={handleSendSms} className="space-y-5">
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-700 mb-1.5">
-                  Número de celular
-                </label>
-                <div className="flex items-center rounded-xl border border-slate-300 bg-slate-50 focus-within:bg-white focus-within:border-orange-600 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all overflow-hidden">
-                  <div className="px-3 py-3 bg-slate-100 border-r border-slate-300 text-slate-700 font-bold text-sm flex items-center gap-1 select-none">
-                    <span>🇲🇽</span>
-                    <span>+52</span>
-                  </div>
-                  <input
-                    type="tel"
-                    id="worker-phone-input"
-                    inputMode="numeric"
-                    autoFocus
-                    placeholder="442 123 4567"
-                    value={rawPhone}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setRawPhone(val);
-                    }}
-                    className="w-full p-3 bg-transparent text-slate-900 text-base font-bold tracking-wider placeholder:text-slate-400 placeholder:font-normal focus:outline-hidden"
-                  />
+          {/* Non-existent account warning with direct action to register */}
+          {nonExistentAccount && (
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-2xl space-y-3">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-orange-950 space-y-1">
+                  <p className="font-bold text-sm text-orange-900">Teléfono no vinculado a un usuario</p>
+                  <p className="text-slate-600 leading-relaxed">
+                    No encontramos una cuenta de trabajador asociada a este número celular. Si realizas trabajos de construcción o remodelación, regístrate para comenzar a recibir solicitudes.
+                  </p>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                  Enviaremos un SMS con un código de seguridad para verificar tu cuenta de Maestro Cerca.
-                </p>
+              </div>
+              <button
+                type="button"
+                id="login-to-register-btn"
+                onClick={() => navigateTo({ type: 'register' })}
+                className="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Registrarme de forma gratuita</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* STEP 1: Phone number input & Facebook Sign-In */}
+          {step === 1 && (
+            <div className="space-y-5">
+              <form onSubmit={handleSendSms} className="space-y-5">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1.5">
+                    Número de celular
+                  </label>
+                  <div className="flex items-center rounded-xl border border-slate-300 bg-slate-50 focus-within:bg-white focus-within:border-orange-600 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all overflow-hidden">
+                    <div className="px-3 py-3 bg-slate-100 border-r border-slate-300 text-slate-700 font-bold text-sm flex items-center gap-1 select-none">
+                      <span>🇲🇽</span>
+                      <span>+52</span>
+                    </div>
+                    <input
+                      type="tel"
+                      id="worker-phone-input"
+                      inputMode="numeric"
+                      autoFocus
+                      placeholder="442 123 4567"
+                      value={rawPhone}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setRawPhone(val);
+                        if (nonExistentAccount) setNonExistentAccount(false);
+                        if (error) setError('');
+                      }}
+                      className="w-full p-3 bg-transparent text-slate-900 text-base font-bold tracking-wider placeholder:text-slate-400 placeholder:font-normal focus:outline-hidden"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                    Enviaremos un SMS con un código de seguridad para acceder a tu cuenta.
+                  </p>
+                </div>
+
+                {/* Invisible reCAPTCHA container */}
+                <div id="recaptcha-login-container"></div>
+
+                <button
+                  type="submit"
+                  id="send-sms-btn"
+                  disabled={isLoading || isFacebookLoading || cleanPhoneDigits.length !== 10}
+                  className="w-full py-3.5 px-4 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Verificando número celular...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Enviar código por SMS</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Dual Auth Divider */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-3 text-slate-400 font-semibold tracking-wider">o bien</span>
+                </div>
               </div>
 
-              {/* Invisible reCAPTCHA container */}
-              <div id="recaptcha-login-container"></div>
+              {/* OAuth Providers */}
+              <div className="space-y-3">
+                {/* Facebook Sign-In Button */}
+                <button
+                  type="button"
+                  id="worker-facebook-login-btn"
+                  onClick={handleFacebookSignIn}
+                  disabled={isLoading || isFacebookLoading}
+                  className="w-full py-3.5 px-4 bg-[#1877F2] hover:bg-[#166FE5] active:bg-[#1465D2] text-white font-bold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isFacebookLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Conectando con Facebook...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FacebookIcon className="w-5 h-5 fill-white shrink-0" />
+                      <span>Continuar con Facebook</span>
+                    </>
+                  )}
+                </button>
 
-              <button
-                type="submit"
-                id="send-sms-btn"
-                disabled={isLoading || cleanPhoneDigits.length !== 10}
-                className="w-full py-3.5 px-4 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Enviando código SMS...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Enviar código</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
+                {/* Texto aclaratorio para evitar cuentas duplicadas */}
+                <p className="text-xs text-slate-500 text-center leading-relaxed pt-1">
+                  ¿Ya tienes una cuenta creada con celular? Inicia con tu teléfono. También puedes vincular Facebook desde tu perfil.
+                </p>
+              </div>
+            </div>
           )}
 
           {/* STEP 2: SMS Code input */}
@@ -291,6 +454,7 @@ export const WorkerLoginView: React.FC = () => {
             ¿Nuevo en Maestro Cerca?{' '}
             <button
               type="button"
+              id="worker-register-link-footer"
               onClick={() => navigateTo({ type: 'register' })}
               className="text-orange-600 font-bold hover:underline cursor-pointer"
             >
@@ -302,7 +466,7 @@ export const WorkerLoginView: React.FC = () => {
         {/* Hyperlocal trust footnote */}
         <div className="flex items-center justify-center gap-2 text-xs text-slate-500 font-medium">
           <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>Autenticación segura por SMS para trabajadores de Querétaro</span>
+          <span>Autenticación segura y directa para profesionales</span>
         </div>
       </div>
     </div>

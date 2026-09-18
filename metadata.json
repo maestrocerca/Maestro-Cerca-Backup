@@ -1,6 +1,6 @@
 {
   "name": "Maestro Cerca",
-  "description": "Plataforma que conecta personas con trabajadores confiables de construcción, mantenimiento y remodelación en Querétaro.",
+  "description": "Plataforma que conecta personas con trabajadores confiables de construcción, mantenimiento y remodelación en el Estado de Querétaro.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

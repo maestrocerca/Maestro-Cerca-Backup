@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { isUserAdmin, DESIGNATED_ADMIN_EMAILS } from '../config/admins';
+import { isUserAdmin } from '../config/admins';
 import { ShieldAlert, LogOut, Lock, AlertCircle } from 'lucide-react';
 
 interface AdminGuardProps {
@@ -40,8 +40,8 @@ export const AdminGuard: React.FC<AdminGuardProps> = ({ children }) => {
       }
 
       try {
-        // Retrieve fresh ID token result to check custom claims
-        const idTokenResult = await firebaseUser.getIdTokenResult();
+        // Force refresh ID token to retrieve up-to-date custom claims immediately
+        const idTokenResult = await firebaseUser.getIdTokenResult(true);
         const claims = idTokenResult?.claims || {};
         const isAuthorized = isUserAdmin(firebaseUser, claims);
         if (isMounted) {
@@ -49,9 +49,8 @@ export const AdminGuard: React.FC<AdminGuardProps> = ({ children }) => {
         }
       } catch (err) {
         console.warn('Error verifying admin custom claims:', err);
-        // Fallback to designated emails validation
         if (isMounted) {
-          setHasAdminPrivilege(isUserAdmin(firebaseUser));
+          setHasAdminPrivilege(false);
         }
       } finally {
         if (isMounted) {
@@ -213,17 +212,15 @@ export const AdminGuard: React.FC<AdminGuardProps> = ({ children }) => {
             </span>
             <h2 className="text-2xl font-black text-slate-900">Área Reservada</h2>
             <p className="text-xs text-slate-600 leading-relaxed">
-              La cuenta autenticada <strong className="text-slate-900">{firebaseUser.email || firebaseUser.phoneNumber || 'actual'}</strong> no cuenta con privilegios administrativos ni token claims de gestión en Maestro Cerca.
+              La cuenta autenticada <strong className="text-slate-900">{firebaseUser?.email || firebaseUser?.phoneNumber || 'actual'}</strong> no cuenta con privilegios administrativos ni permisos de gestión en Maestro Cerca.
             </p>
           </div>
 
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-left text-xs text-slate-600 space-y-1">
-            <p className="font-bold text-slate-800">Correos autorizados para administración:</p>
-            <ul className="list-disc list-inside text-[11px] text-slate-500 space-y-0.5">
-              {DESIGNATED_ADMIN_EMAILS.map((email) => (
-                <li key={email} className="font-mono">{email}</li>
-              ))}
-            </ul>
+          <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-left text-xs text-amber-900 space-y-1.5">
+            <p className="font-bold text-amber-950">Esta cuenta no tiene habilitado el permiso administrativo requerido.</p>
+            <p className="text-[11px] text-amber-800 leading-relaxed">
+              El acceso administrativo requiere autorización interna de Maestro Cerca.
+            </p>
           </div>
 
           <div className="flex flex-col gap-2 pt-2">

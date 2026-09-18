@@ -19,8 +19,8 @@ import {
   Wrench
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { Worker } from '../types';
-import { distanceFromZibata } from '../lib/geo';
+import { Worker, isPubliclyVisible } from '../types';
+import { WorkerAvatar } from './WorkerAvatar';
 
 interface SearchResultsViewProps {
   initialTrade?: string;
@@ -56,9 +56,8 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
   const filteredWorkers = useMemo(() => {
     return workers
       .filter((w) => {
-        // Enforce approval rule: only approved profiles appear in public search!
-        if (w.aprobado === false) return false;
-        if (w.profileActive === false) return false;
+        // Canonical public visibility check (approved, available, onboarding complete, not draft)
+        if (!isPubliclyVisible(w)) return false;
 
         // Trade filter
         if (tradeFilter) {
@@ -123,18 +122,64 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
     window.location.href = `tel:${worker.phone}`;
   };
 
+  // Pluralization helper for trade titles in Spanish
+  const pluralizeTrade = (trade: string): string => {
+    const trimmed = trade.trim();
+    if (!trimmed) return '';
+    const lower = trimmed.toLowerCase();
+
+    const knownPlurals: Record<string, string> = {
+      'albañil': 'Albañiles',
+      'plomero': 'Plomeros',
+      'electricista': 'Electricistas',
+      'pintor': 'Pintores',
+      'carpintero': 'Carpinteros',
+      'herrero': 'Herreros',
+      'jardinero': 'Jardineros',
+      'mecánico': 'Mecánicos',
+      'mecanico': 'Mecánicos',
+      'soldador': 'Soldadores',
+      'instalador': 'Instaladores',
+      'cerrajero': 'Cerrajeros',
+      'fumigador': 'Fumigadores',
+      'impermeabilizador': 'Impermeabilizadores',
+      'vidriero': 'Vidrieros',
+      'técnico': 'Técnicos',
+      'tecnico': 'Técnicos',
+      'yesero': 'Yeseros',
+      'tablaroquero': 'Tablaroqueros',
+      'azulejero': 'Azulejeros',
+      'fontanero': 'Fontaneros',
+    };
+
+    if (knownPlurals[lower]) {
+      return knownPlurals[lower];
+    }
+
+    if (/[lrdzn]$/i.test(trimmed)) {
+      return `${trimmed}es`;
+    }
+    if (/z$/i.test(trimmed)) {
+      return `${trimmed.slice(0, -1)}ces`;
+    }
+    if (/s$/i.test(trimmed)) {
+      return trimmed;
+    }
+    return `${trimmed}s`;
+  };
+
   // Dynamic Title
   const getPageTitle = () => {
     if (tradeFilter && areaFilter) {
-      return `${tradeFilter}s en ${areaFilter}, Querétaro`;
+      return `${pluralizeTrade(tradeFilter)} en ${areaFilter}`;
     }
     if (tradeFilter) {
-      return `${tradeFilter}s en Querétaro`;
+      return pluralizeTrade(tradeFilter);
     }
     if (areaFilter) {
-      return `Trabajadores de oficios en ${areaFilter}, Querétaro`;
+      return `Trabajadores de oficios en ${areaFilter}`;
     }
-    return `Trabajadores y especialistas en Querétaro`;
+    return `Directorio de trabajadores y especialistas`;
   };
 
   return (
@@ -146,7 +191,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-orange-600 uppercase tracking-wider mb-1">
               <MapPin className="w-3.5 h-3.5" />
-              <span>Directorio Querétaro</span>
+              <span>Directorio de trabajadores</span>
             </div>
             <h1 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
               {getPageTitle()}
@@ -178,7 +223,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h2 className="font-black text-slate-900 text-base flex items-center gap-2">
                 <Filter className="w-4 h-4 text-orange-600" />
-                <span>Filtros de búsqueda</span>
+                <span className="text-[20px] font-bold">Filtros de búsqueda</span>
               </h2>
               {(tradeFilter || areaFilter || verifiedOnly || minExperience > 0) && (
                 <button
@@ -217,7 +262,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
             {/* Filter 2: Zona */}
             <div className="space-y-1.5">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Zona o Municipio
+                Municipio o Zona
               </label>
               <select
                 id="filter-area-select"
@@ -228,7 +273,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
                 }}
                 className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               >
-                <option value="">Todas las zonas</option>
+                <option value="">Todas las ubicaciones</option>
                 {serviceAreas.filter((a) => a.active).map((area) => (
                   <option key={area.id} value={area.name}>
                     {area.name} ({area.municipality})
@@ -330,8 +375,13 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
             </div>
           ) : (
             filteredWorkers.map((worker) => {
-              const isVerified = worker.verificationStatus === 'verified';
-              const hasWorkPhotos = worker.workPhotos && worker.workPhotos.length > 0;
+              const isVerified = worker.verificationStatus === 'verified' || worker.verificado === true;
+              const workPhotoList = (worker.workPhotos && worker.workPhotos.length > 0)
+                ? worker.workPhotos
+                : (worker.fotosTrabajos && worker.fotosTrabajos.length > 0)
+                  ? worker.fotosTrabajos.map((url, idx) => ({ id: `ft-${idx}`, url, title: 'Trabajo realizado' }))
+                  : [];
+              const hasWorkPhotos = workPhotoList.length > 0;
               const servicesList = worker.services && worker.services.length > 0 ? worker.services : [];
               const maxVisibleServices = 4;
               const visibleServices = servicesList.slice(0, maxVisibleServices);
@@ -350,23 +400,16 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
                 >
                   <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
                     
-                    {/* Worker Avatar & Status Badge (Generic for Registered, Photo for Verified) */}
-                    <div className="relative shrink-0 flex items-center sm:block">
-                      {isVerified && worker.profilePhoto ? (
-                        <img
-                          src={worker.profilePhoto}
-                          alt={`${worker.firstName} ${worker.lastName}`}
-                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border border-slate-200 shadow-xs"
+                    {/* Worker Avatar & Status Badge */}
+                    <div className="relative shrink-0 flex items-center sm:block w-[150px] h-[150px] pl-[1px] ml-0 mt-[70px]">
+                      <div className="w-[150px] h-[150px] pl-[25px]">
+                        <WorkerAvatar
+                          worker={worker}
+                          alt={worker.nombre || `${worker.firstName} ${worker.lastName}`}
+                          size="custom"
+                          className="w-[92px] h-[92px] pl-0 rounded-2xl [&_svg]:!w-[120px] [&_svg]:!h-[120px]"
                         />
-                      ) : (
-                        <div 
-                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-slate-100 border border-slate-200 flex flex-col items-center justify-center text-slate-400 shadow-xs"
-                          title="Trabajador registrado"
-                        >
-                          <User className="w-9 h-9 text-slate-400" />
-                          <span className="text-[10px] font-semibold text-slate-500 mt-1">Registrado</span>
-                        </div>
-                      )}
+                      </div>
 
                       {/* Mobile Status Badge */}
                       <div className="sm:hidden ml-3">
@@ -389,10 +432,10 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
                       {/* 1. Name & Main Trade & Status */}
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
-                          <h3 className="text-lg sm:text-xl font-black text-slate-900 group-hover:text-orange-600 transition-colors">
+                          <h3 className="text-[24px] font-black text-slate-900 group-hover:text-orange-600 transition-colors">
                             {worker.firstName} {worker.lastName}
                           </h3>
-                          <p className="text-sm font-bold text-orange-600 mt-0.5">
+                          <p className="text-[19px] font-bold text-orange-600 mt-0.5">
                             {worker.mainTrade}
                             {worker.secondaryTrades && worker.secondaryTrades.length > 0 && (
                               <span className="text-slate-500 font-normal text-xs ml-1.5">
@@ -405,12 +448,12 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
                         {/* Desktop Verification Badge */}
                         <div className="hidden sm:block">
                           {isVerified ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 shadow-xs">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[16px] font-bold border border-green-200 shadow-xs">
                               <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
                               Verificado por Maestro Cerca
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium border border-slate-200">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[16px] font-medium border border-slate-200">
                               Registrado en Maestro Cerca
                             </span>
                           )}
@@ -419,7 +462,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
 
                       {/* 2. PRIORITY SECTION: TRABAJOS QUE REALIZA */}
                       {servicesList.length > 0 && (
-                        <div className="space-y-1.5 pt-0.5">
+                        <div className="space-y-1.5 ml-0 pt-[4px] mb-[11px]">
                           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
                             Trabajos que realiza:
                           </p>
@@ -465,25 +508,28 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
                       {/* 5. Work photo thumbnails */}
                       {hasWorkPhotos && (
                         <div className="flex items-center gap-2 pt-1">
-                          {worker.workPhotos.slice(0, 2).map((photo) => (
+                          {workPhotoList.slice(0, 2).map((photo) => (
                             <div key={photo.id} className="relative group/photo">
                               <img
                                 src={photo.url}
                                 alt={photo.title || 'Trabajo realizado'}
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = 'none';
+                                }}
                                 className="w-16 h-12 sm:w-20 sm:h-14 rounded-lg object-cover border border-slate-200 shadow-xs"
                               />
                             </div>
                           ))}
-                          {worker.workPhotos.length > 2 && (
+                          {workPhotoList.length > 2 && (
                             <span className="text-[11px] font-semibold text-slate-500 pl-1">
-                              +{worker.workPhotos.length - 2} fotos más
+                              +{workPhotoList.length - 2} fotos más
                             </span>
                           )}
                         </div>
                       )}
 
                       {/* 6. Action Buttons Row */}
-                      <div className="pt-3 flex flex-wrap items-center gap-2 sm:gap-3 border-t border-slate-100">
+                      <div className="pt-0 flex flex-wrap items-center gap-2 sm:gap-3 border-t border-slate-100">
                         {/* Primary WhatsApp CTA */}
                         <button
                           type="button"
@@ -510,7 +556,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
                           onClick={() => navigateTo({ type: 'profile', workerSlug: worker.slug })}
                           className="py-2.5 px-3.5 text-slate-700 hover:text-slate-900 font-bold text-xs sm:text-sm hover:bg-slate-100 rounded-xl transition-colors ml-auto flex items-center gap-1 cursor-pointer"
                         >
-                          <span>Ver perfil completo</span>
+                          <span className="text-[15px]">Ver perfil completo</span>
                           <ChevronRight className="w-4 h-4 text-slate-400" />
                         </button>
                       </div>

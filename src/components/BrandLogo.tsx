@@ -2,6 +2,8 @@ import React from 'react';
 
 interface BrandLogoProps {
   className?: string;
+  iconClassName?: string;
+  iconStyle?: React.CSSProperties;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   variant?: 'full' | 'icon' | 'stacked' | 'logotipo' | 'image';
   textColor?: 'dark' | 'light' | 'auto';
@@ -11,6 +13,7 @@ interface BrandLogoProps {
 // Brand Assets Paths from uploaded files
 export const BRAND_ASSET_PROFILE_ICON = '/Foto%20de%20perfil%20Oficial.jpg';
 export const BRAND_ASSET_FULL_LOGO = '/Logotipo%20V1.jpg';
+export const BRAND_ASSET_WEBSITE_LOGO = '/Logo%20Oficial%20para%20sitio%20web.jpg';
 
 /**
  * Standalone Isotipo / Brand Icon using official "Foto de perfil Oficial.jpg"
@@ -19,10 +22,12 @@ export const BrandLogoIcon: React.FC<{
   className?: string; 
   size?: number;
   alt?: string;
+  style?: React.CSSProperties;
 }> = ({ 
   className = '', 
   size = 40,
   alt = 'Maestro Cerca Logo',
+  style,
 }) => {
   return (
     <img
@@ -30,7 +35,7 @@ export const BrandLogoIcon: React.FC<{
       alt={alt}
       width={size}
       height={size}
-      style={{ width: `${size}px`, height: `${size}px` }}
+      style={{ width: `${size}px`, height: `${size}px`, ...style }}
       className={`shrink-0 object-contain select-none ${className}`}
       loading="eager"
       decoding="async"
@@ -74,6 +79,8 @@ export const BrandLogoFullImage: React.FC<{
 
 export const BrandLogo: React.FC<BrandLogoProps> = ({
   className = '',
+  iconClassName = '',
+  iconStyle,
   size = 'md',
   variant = 'full',
   textColor = 'dark',
@@ -102,7 +109,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   const subTextColor = isDarkText ? 'text-slate-500' : 'text-slate-300';
 
   if (variant === 'icon') {
-    return <BrandLogoIcon size={iconPx} className={className} />;
+    return <BrandLogoIcon size={iconPx} className={className} style={iconStyle} />;
   }
 
   if (variant === 'logotipo' || variant === 'image') {
@@ -112,7 +119,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   if (variant === 'stacked') {
     return (
       <div className={`flex flex-col items-center text-center gap-2 ${className}`}>
-        <BrandLogoIcon size={iconPx * 1.3} />
+        <BrandLogoIcon size={iconPx * 1.3} className={iconClassName} style={iconStyle} />
         <div>
           <span className={`font-black tracking-tight ${textSizes[size]} ${mainTextColor} block leading-tight font-sans`}>
             Maestro Cerca
@@ -129,7 +136,11 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
 
   return (
     <div className={`flex items-center gap-2.5 sm:gap-3 group ${className}`}>
-      <BrandLogoIcon size={iconPx} className="transition-transform group-hover:scale-105 duration-200" />
+      <BrandLogoIcon 
+        size={iconPx} 
+        className={`transition-transform group-hover:scale-105 duration-200 ${iconClassName}`} 
+        style={iconStyle}
+      />
       <div className="flex flex-col justify-center leading-none">
         <div className="flex flex-col">
           <span className={`font-black tracking-tight ${textSizes[size]} ${mainTextColor} leading-tight font-sans`}>

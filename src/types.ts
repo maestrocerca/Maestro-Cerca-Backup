@@ -1,4 +1,12 @@
 export type VerificationStatus = 'registered' | 'verified';
+export type ProfileStatus = 'Pendiente' | 'Aprobado' | 'Activo';
+
+export interface AdminAuthMethodInfo {
+  uid: string;
+  providerIds: string[];
+  hasPhone: boolean;
+  hasFacebook: boolean;
+}
 
 export interface WorkPhoto {
   id: string;
@@ -23,23 +31,71 @@ export interface VerificationRequest {
  * Collections needed: `maestros`
  * Fields: { id, nombre, oficio, bio, calificacion, radioKm, lat, lng, fotoUrl, telefonoWhatsApp, nivel, verificado, aprobado, fechaRegistro, ... }
  */
+// Default fallback avatar URL (blank to favor neutral vector worker avatar component)
+export const DEFAULT_AVATAR_URL = '';
+
+/**
+ * Returns the valid photo URL for a worker, strictly adhering to the public moderation rules:
+ * - If profilePhotoReviewStatus is NOT 'approved', it returns empty string so the neutral vector worker avatar is used.
+ * - Authenticated owners/admins can pass allowPendingPreview: true with an in-memory/authenticated previewUrl.
+ */
+export const getWorkerAvatarSrc = (
+  worker?: { 
+    photoUrl?: string | null; 
+    fotoUrl?: string | null; 
+    profilePhoto?: string | null;
+    profilePhotoReviewStatus?: 'none' | 'pending' | 'approved' | 'rejected' | string;
+    verificado?: boolean;
+    aprobado?: boolean;
+  } | null,
+  options?: { allowPendingPreview?: boolean; previewUrl?: string | null }
+): string => {
+  if (!worker) return '';
+  if (options?.allowPendingPreview && options?.previewUrl) {
+    return options.previewUrl;
+  }
+  // Public privacy rule: ONLY display real photo if officially approved by admin
+  if (worker.profilePhotoReviewStatus !== 'approved') {
+    return '';
+  }
+  const raw = worker.profilePhoto?.trim() || worker.fotoUrl?.trim() || worker.photoUrl?.trim();
+  return raw || '';
+};
+
+export interface ProfileReport {
+  id: string;
+  workerId: string;
+  workerSlug?: string;
+  workerNameSnapshot?: string;
+  workerTradeSnapshot?: string;
+  reason: string;
+  status: 'pending' | 'reviewed' | 'dismissed' | 'resolved';
+  createdAt: string;
+  adminNotes?: string;
+}
+
 export interface Maestro {
   id: string;
   nombre: string;
   oficio: string;
   bio: string;
-  calificacion: number;
-  radioKm: number;
-  lat: number;
-  lng: number;
+  calificacion?: number;
+  radioKm?: number;
+  lat?: number | null;
+  lng?: number | null;
   fotoUrl: string;
   telefonoWhatsApp: string;
-  nivel: 'Master' | 'Oficial' | 'Especialista' | string;
+  nivel: 'Aspirante' | 'Master' | 'Oficial' | 'Especialista' | string;
   verificado: boolean;
   aprobado: boolean;
+  statusPerfil?: ProfileStatus;
+  verifiedAt?: string;
+  verifiedBy?: string;
   fechaRegistro: string;
   tieneVerificacionPendiente?: boolean;
   fechaSubidaDoc?: string;
+  origen?: string;
+  isDemoAccount?: boolean;
 
   // Additional optional and relational properties for UI richness & compatibility
   userId?: string;
@@ -48,8 +104,23 @@ export interface Maestro {
   lastName?: string;
   email?: string;
   phone?: string;
+  phoneE164?: string;
   whatsapp?: string;
+  telefono?: string;
+  apellidos?: string;
+  oficioPrincipal?: string;
+  serviciosAdicionales?: string;
+  ciudad?: string;
+  zonas?: string;
+  experiencia?: string;
+  finishedAt?: string;
+  manychatId?: string;
+  registrationMethod?: 'phone' | 'facebook' | 'manychat_csv' | string;
   profilePhoto?: string;
+  photoUrl?: string;
+  profilePhotoReviewStatus?: 'none' | 'pending' | 'approved' | 'rejected' | string;
+  pendingProfilePhotoPath?: string | null;
+  profilePhotoReviewedAt?: string;
   mainTrade?: string;
   secondaryTrades?: string[];
   services?: string[];
@@ -57,17 +128,33 @@ export interface Maestro {
   yearsExperience?: number;
   serviceAreas?: string[];
   workPhotos?: WorkPhoto[];
+  fotosTrabajos?: string[];
   verificationStatus?: VerificationStatus;
   phoneVerified?: boolean;
+  phoneVerifiedAt?: string;
+  phoneVerificationMethod?: 'sms' | string;
   identityVerified?: boolean;
   referencesVerified?: boolean;
   photosReviewed?: boolean;
+  /** @deprecated Legacy field. Do NOT use as source of truth. Use `aprobado`, `statusPerfil`, and `isAvailable`. */
   profileActive?: boolean;
+  isAvailable?: boolean;
   joinedDate?: string;
   privacyNoticeAccepted?: boolean;
   privacyNoticeAcceptedAt?: string;
   privacyNoticeVersion?: string;
+  termsAccepted?: boolean;
+  termsAcceptedAt?: string;
+  termsVersion?: string;
+  status?: 'draft' | 'registered' | 'active' | 'suspended' | string;
+  onboardingIncomplete?: boolean;
+  authProviders?: string[];
   verificationRequest?: VerificationRequest;
+  source?: 'web' | 'manychat' | string;
+  claimedFromPreWorkerId?: string;
+  claimedAt?: string;
+  disponibilidad?: string;
+  telefonoPublico?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -75,16 +162,58 @@ export interface Maestro {
 // Worker type is synonymous with Maestro for seamless UI compatibility
 export type Worker = Maestro;
 
+export interface PreWorker {
+  id: string;
+  phoneNumber: string; // E.164 +52XXXXXXXXXX
+  phone: string; // 10 digits
+  whatsappPhone: string;
+  nombre: string;
+  firstName?: string;
+  lastName?: string;
+  ciudad?: string;
+  serviceAreas?: string[];
+  oficio: string;
+  mainTrade?: string;
+  servicios?: string[];
+  yearsExperience?: number;
+  disponibilidad?: string;
+  telefonoPublico?: string;
+  profilePhoto?: string;
+  fotoUrl?: string;
+  workPhotos?: WorkPhoto[];
+  fotosTrabajos?: string[];
+  manychatUserId?: string;
+  manyChatUserId?: string;
+  oficio_principal?: string;
+  servicios_adicionales?: string;
+  ciudad_principal?: string;
+  zonas_cobertura?: string;
+  experiencia?: string;
+  estadoRegistro?: string;
+  privacyNoticeAccepted?: boolean;
+  privacyNoticeAcceptedAt?: string;
+  privacyNoticeVersion?: string;
+  source: 'manychat';
+  status: 'pending_claim' | 'claimed';
+  profileType: 'registered';
+  verificado: boolean;
+  claimedByUid?: string | null;
+  claimedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
  * Lead and Contact Analytics Entity:
  * Collection: `solicitudes_contacto`
- * Schema: { id, maestroId, fecha, origen: "zibata_web" }
+ * Schema: { id, maestroId, fecha, timestamp, origen: "maestro_cerca_web" }
  */
 export interface SolicitudContacto {
   id: string;
   maestroId: string;
   fecha: string;
-  origen: 'zibata_web';
+  timestamp?: string;
+  origen: 'maestro_cerca_web' | 'zibata_web' | string;
   maestroNombre?: string;
   oficio?: string;
   telefono?: string;
@@ -141,8 +270,39 @@ export type AppView =
   | { type: 'profile'; workerSlug: string }
   | { type: 'register'; step?: number }
   | { type: 'login' }
-  | { type: 'dashboard'; tab?: 'profile' | 'services' | 'photos' | 'verification' | 'stats' }
-  | { type: 'admin'; tab?: 'maestros' | 'workers' | 'requests' | 'leads' | 'trades' | 'areas' | 'analytics' }
+  | { type: 'dashboard'; tab?: 'profile' | 'photos' | 'stats' }
+  | { type: 'admin'; tab?: 'maestros' | 'workers' | 'requests' | 'leads' | 'trades' | 'areas' | 'analytics' | 'import' }
   | { type: 'how-it-works' }
   | { type: 'privacy' }
   | { type: 'terms' };
+
+/**
+ * Canonical helper for public profile visibility.
+ * Returns true if and only if:
+ * - Profile exists
+ * - Status (statusPerfil or aprobado) is approved
+ * - isAvailable !== false (defaults to true if undefined)
+ * - onboardingIncomplete !== true
+ * - status !== 'draft'
+ */
+export function isPubliclyVisible(worker: Maestro | Worker | null | undefined): boolean {
+  if (!worker) return false;
+  const isApproved =
+    worker.statusPerfil === 'Aprobado' ||
+    worker.statusPerfil === 'Activo' ||
+    worker.aprobado === true;
+  if (!isApproved) return false;
+
+  const hasVerifiedPhone =
+    worker.phoneVerified === true &&
+    (worker.phoneVerifiedAt != null ||
+      worker.phoneVerificationMethod === 'firebase_sms' ||
+      worker.phoneVerificationMethod === 'sms');
+  if (!hasVerifiedPhone) return false;
+
+  if (worker.isAvailable === false) return false;
+  if (worker.onboardingIncomplete === true) return false;
+  if (worker.status === 'draft') return false;
+  return true;
+}
+

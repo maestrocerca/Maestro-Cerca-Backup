@@ -1,13 +1,14 @@
 import React from 'react';
-import { Hammer, ShieldCheck, MapPin, Phone, MessageSquare, AlertCircle } from 'lucide-react';
+import { Hammer, ShieldCheck, MapPin, Phone, MessageSquare, AlertCircle, SlidersHorizontal, Lock } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { BrandLogo } from './BrandLogo';
+import footerLogo from '../assets/images/regenerated_image_1789674062841.jpg';
 
 export const Footer: React.FC = () => {
   const { navigateTo } = useStore();
 
   return (
-    <footer className="bg-slate-900 text-slate-400 border-t border-slate-800">
+    <footer className="bg-[#0c2340] text-slate-400 border-t border-slate-800">
       {/* Upper disclaimer box */}
       <div className="border-b border-slate-800 bg-slate-950/60 py-6 px-4">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-3 text-xs text-slate-400">
@@ -20,25 +21,29 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16 bg-[#0c2340]">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
           
           {/* Brand Col */}
           <div className="lg:col-span-2 space-y-4">
             <div 
               onClick={() => navigateTo({ type: 'home' })}
-              className="cursor-pointer inline-flex"
+              className="cursor-pointer inline-flex items-center bg-[#0c2340] px-3 pt-1 pb-1.5 -mt-0.5 rounded-xl shadow-xs"
             >
-              <BrandLogo size="md" textColor="light" />
+              <img 
+                src={footerLogo} 
+                alt="Maestro Cerca Logo" 
+                className="h-9 sm:h-10 w-auto object-contain p-0 m-0" 
+              />
             </div>
             
-            <p className="text-slate-400 text-sm leading-relaxed max-w-sm">
-              Maestro Cerca conecta personas que necesitan trabajos de construcción, mantenimiento o remodelación con trabajadores de oficios confiables y verificados en Querétaro.
+            <p className="text-slate-400 text-sm leading-relaxed max-w-sm ml-[18px]">
+              Maestro Cerca conecta personas que necesitan trabajos de construcción, mantenimiento o remodelación con trabajadores de oficios confiables y verificados en todo el Estado de Querétaro.
             </p>
 
-            <div className="flex items-center gap-2 text-xs text-slate-400">
+            <div className="flex items-center gap-2 text-xs text-slate-400 ml-[18px]">
               <MapPin className="w-4 h-4 text-orange-500 shrink-0" />
-              <span>Santiago de Querétaro, Qro., México</span>
+              <span>Estado de Querétaro, México</span>
             </div>
           </div>
 
@@ -56,38 +61,6 @@ export const Footer: React.FC = () => {
                   Buscar trabajadores
                 </button>
               </li>
-              <li>
-                <button
-                  onClick={() => navigateTo({ type: 'search', trade: 'Albañil' })}
-                  className="hover:text-orange-400 transition-colors text-slate-400"
-                >
-                  Albañiles en Querétaro
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigateTo({ type: 'search', trade: 'Plomero' })}
-                  className="hover:text-orange-400 transition-colors text-slate-400"
-                >
-                  Plomeros en Querétaro
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigateTo({ type: 'search', trade: 'Electricista' })}
-                  className="hover:text-orange-400 transition-colors text-slate-400"
-                >
-                  Electricistas en Querétaro
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigateTo({ type: 'how-it-works' })}
-                  className="hover:text-orange-400 transition-colors"
-                >
-                  Cómo funciona
-                </button>
-              </li>
             </ul>
           </div>
 
@@ -100,7 +73,7 @@ export const Footer: React.FC = () => {
               <li>
                 <button
                   onClick={() => navigateTo({ type: 'register' })}
-                  className="text-orange-400 hover:text-orange-300 font-medium transition-colors"
+                  className="text-orange-400 hover:text-orange-300 font-medium transition-colors text-left"
                 >
                   Registrarme como trabajador
                 </button>
@@ -111,22 +84,6 @@ export const Footer: React.FC = () => {
                   className="hover:text-orange-400 transition-colors text-slate-400"
                 >
                   Iniciar sesión
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigateTo({ type: 'how-it-works' })}
-                  className="hover:text-orange-400 transition-colors text-slate-400"
-                >
-                  Beneficios de registrarte
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigateTo({ type: 'how-it-works' })}
-                  className="hover:text-orange-400 transition-colors text-slate-400"
-                >
-                  Proceso de verificación
                 </button>
               </li>
             </ul>
@@ -158,6 +115,16 @@ export const Footer: React.FC = () => {
                   Términos y condiciones
                 </button>
               </li>
+              <li className="pt-1">
+                <button
+                  id="footer-admin-portal-btn"
+                  onClick={() => navigateTo({ type: 'admin' })}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-2xs"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-orange-400" />
+                  <span>Portal Administrativo</span>
+                </button>
+              </li>
               <li>
                 <span className="text-slate-400">
                   Contacto: <a href="mailto:soporte@maestrocerca.mx" className="text-orange-400 hover:underline">soporte@maestrocerca.mx</a>
@@ -170,7 +137,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom bar */}
         <div className="mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} Maestro Cerca. Todos los derechos reservados. Querétaro, México.</p>
+          <p>© {new Date().getFullYear()} Maestro Cerca. Todos los derechos reservados. Estado de Querétaro, México.</p>
           <div className="flex flex-wrap items-center gap-4 text-slate-400">
             <a
               href="/aviso-de-privacidad"
@@ -182,6 +149,14 @@ export const Footer: React.FC = () => {
             >
               Aviso de Privacidad
             </a>
+            <button
+              id="footer-bottom-admin-btn"
+              onClick={() => navigateTo({ type: 'admin' })}
+              className="text-slate-400 hover:text-orange-400 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Lock className="w-3.5 h-3.5 text-slate-500 hover:text-orange-400" />
+              <span>Acceso Admin</span>
+            </button>
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-green-500" />
               Directorio con Verificación Manual

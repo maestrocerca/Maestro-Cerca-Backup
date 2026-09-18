@@ -9,14 +9,13 @@ import {
   X, 
   ChevronRight,
   LogOut,
-  SlidersHorizontal,
-  MapPin
+  SlidersHorizontal
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { BrandLogo } from './BrandLogo';
+import { WorkerAvatar } from './WorkerAvatar';
 
 export const Navbar: React.FC = () => {
-  const { currentView, navigateTo, currentWorker, logoutWorker } = useStore();
+  const { currentView, navigateTo, currentWorker, logoutWorker, isAdmin, isDemoMode, isWorkerRegistrationActive } = useStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isActive = (type: string) => {
@@ -30,12 +29,6 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
-      {/* Top micro-bar highlighting Querétaro hyperlocal focus */}
-      <div className="bg-slate-900 text-slate-300 text-xs py-1.5 px-4 text-center font-medium flex items-center justify-center gap-1.5 border-b border-slate-800">
-        <MapPin className="w-3.5 h-3.5 text-orange-400" />
-        <span>Directorio de trabajadores y especialistas de confianza en <strong className="text-white">Querétaro, Qro.</strong></span>
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
           
@@ -43,9 +36,13 @@ export const Navbar: React.FC = () => {
           <div 
             id="brand-logo"
             onClick={() => handleNav(() => navigateTo({ type: 'home' }))}
-            className="cursor-pointer select-none"
+            className="cursor-pointer select-none flex items-center"
           >
-            <BrandLogo size="md" />
+            <img 
+              src="/Logo%20Oficial%20para%20sitio%20web.jpg"
+              alt="Maestro Cerca Logo"
+              className="h-10 sm:h-12 w-auto object-contain pl-[22px] pt-[2px] pr-0 pb-[3px]"
+            />
           </div>
 
           {/* Desktop Navigation */}
@@ -75,37 +72,53 @@ export const Navbar: React.FC = () => {
               <span>Buscar trabajadores</span>
             </button>
 
-            <div className="h-4 w-px bg-slate-200 mx-2" />
-
-            {/* Admin quick toggle for testing */}
-            <button
-              id="nav-admin-btn"
-              onClick={() => navigateTo({ type: 'admin' })}
-              title="Panel Administrativo (Demo)"
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 border ${
-                isActive('admin') 
-                  ? 'bg-slate-900 text-white border-slate-900' 
-                  : 'text-slate-500 hover:text-slate-900 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Admin MVP</span>
-            </button>
-
-            {/* Worker CTA or Worker Profile */}
-            {currentWorker ? (
+            {/* Navigation CTAs based on session role */}
+            {isAdmin ? (
+              <div className="flex items-center gap-2 ml-2">
+                <button
+                  id="nav-admin-panel-btn"
+                  onClick={() => navigateTo({ type: 'admin' })}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs ${
+                    isActive('admin') 
+                      ? 'bg-slate-900 text-white' 
+                      : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-200'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-orange-600" />
+                  <span>Panel Admin</span>
+                </button>
+                <button
+                  id="nav-admin-logout-btn"
+                  onClick={logoutWorker}
+                  title="Cerrar sesión de administrador"
+                  className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden lg:inline text-slate-500">Salir</span>
+                </button>
+              </div>
+            ) : currentWorker ? (
               <div className="flex items-center gap-2 ml-2">
                 <button
                   id="nav-dashboard-btn"
                   onClick={() => navigateTo({ type: 'dashboard' })}
-                  className="px-4 py-2 rounded-full bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold shadow-xs transition-all flex items-center gap-2"
+                  className={`px-4 py-2 rounded-full text-white text-sm font-semibold shadow-xs transition-all flex items-center gap-2 ${
+                    isDemoMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-orange-600 hover:bg-orange-700'
+                  }`}
                 >
-                  <img 
-                    src={currentWorker.profilePhoto} 
+                  <WorkerAvatar
+                    worker={currentWorker}
                     alt={currentWorker.firstName}
-                    className="w-5 h-5 rounded-full object-cover border border-white/40" 
+                    size="custom"
+                    className="w-5 h-5 !rounded-full !border-white/40 shadow-none"
+                    imgClassName="rounded-full"
                   />
                   <span>Mi perfil ({currentWorker.firstName})</span>
+                  {isDemoMode && (
+                    <span className="px-1.5 py-0.2 text-[10px] bg-amber-800 text-amber-100 font-bold rounded-full uppercase tracking-wider">
+                      Demo
+                    </span>
+                  )}
                 </button>
                 <button
                   id="nav-logout-btn"
@@ -116,19 +129,25 @@ export const Navbar: React.FC = () => {
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>
+            ) : isWorkerRegistrationActive ? (
+              <div className="flex items-center ml-2">
+                <span className="text-xs font-semibold text-amber-800 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200">
+                  Registro en proceso
+                </span>
+              </div>
             ) : (
               <div className="flex items-center gap-2 ml-2">
                 <button
                   id="nav-worker-login-btn"
                   onClick={() => navigateTo({ type: 'login' })}
-                  className="px-3.5 py-2 rounded-lg text-slate-600 hover:text-slate-900 text-sm font-medium hover:bg-slate-50 transition-colors"
+                  className="px-3.5 py-2 rounded-lg text-slate-600 hover:text-slate-900 text-sm font-medium hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Iniciar sesión
                 </button>
                 <button
                   id="nav-worker-register-btn"
                   onClick={() => navigateTo({ type: 'register' })}
-                  className="text-sm font-semibold text-orange-600 bg-orange-50 px-4 py-2 rounded-full border border-orange-100 hover:bg-orange-100 transition-colors flex items-center gap-1.5"
+                  className="text-sm font-semibold text-orange-600 bg-orange-50 px-4 py-2 rounded-full border border-orange-100 hover:bg-orange-100 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <User className="w-4 h-4" />
                   <span>Registrarme como trabajador</span>
@@ -142,12 +161,14 @@ export const Navbar: React.FC = () => {
             {currentWorker && (
               <button
                 onClick={() => navigateTo({ type: 'dashboard' })}
-                className="p-1.5 bg-orange-50 rounded-lg border border-orange-200"
+                className="p-1 bg-orange-50 rounded-lg border border-orange-200"
               >
-                <img 
-                  src={currentWorker.profilePhoto} 
+                <WorkerAvatar
+                  worker={currentWorker}
                   alt={currentWorker.firstName}
-                  className="w-7 h-7 rounded-full object-cover" 
+                  size="custom"
+                  className="w-7 h-7 !rounded-full !border-orange-300 shadow-none"
+                  imgClassName="rounded-full"
                 />
               </button>
             )}
@@ -191,31 +212,55 @@ export const Navbar: React.FC = () => {
               <ChevronRight className="w-4 h-4 text-slate-400" />
             </button>
 
-            <button
-              onClick={() => handleNav(() => navigateTo({ type: 'admin' }))}
-              className={`w-full text-left px-3.5 py-2.5 rounded-xl font-medium text-sm flex items-center justify-between ${
-                isActive('admin') ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <SlidersHorizontal className="w-4 h-4 text-slate-500" />
-                <span>Panel Administrativo (Demo)</span>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </button>
+            {isAdmin && (
+              <button
+                id="mobile-nav-admin-btn"
+                onClick={() => handleNav(() => navigateTo({ type: 'admin' }))}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl font-medium text-sm flex items-center justify-between ${
+                  isActive('admin') ? 'bg-slate-900 text-white font-bold' : 'text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <SlidersHorizontal className="w-4 h-4 text-orange-400" />
+                  <span>Panel Administrativo</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </button>
+            )}
           </div>
 
           <div className="pt-3 border-t border-slate-200 space-y-2">
-            {currentWorker ? (
+            {isAdmin ? (
+              <div className="space-y-2">
+                <button
+                  id="mobile-drawer-admin-btn"
+                  onClick={() => handleNav(() => navigateTo({ type: 'admin' }))}
+                  className="w-full py-3 px-4 rounded-xl bg-slate-900 text-white font-bold text-center flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-orange-400" />
+                  <span>Panel Administrativo</span>
+                </button>
+                <button
+                  id="mobile-drawer-admin-logout-btn"
+                  onClick={() => handleNav(logoutWorker)}
+                  className="w-full py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm text-center flex items-center justify-center gap-2 hover:bg-slate-50"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Cerrar sesión de administrador</span>
+                </button>
+              </div>
+            ) : currentWorker ? (
               <div className="space-y-2">
                 <button
                   onClick={() => handleNav(() => navigateTo({ type: 'dashboard' }))}
                   className="w-full py-3 px-4 rounded-xl bg-orange-600 text-white font-bold text-center flex items-center justify-center gap-2 shadow-sm"
                 >
-                  <img 
-                    src={currentWorker.profilePhoto} 
+                  <WorkerAvatar
+                    worker={currentWorker}
                     alt={currentWorker.firstName}
-                    className="w-5 h-5 rounded-full object-cover" 
+                    size="custom"
+                    className="w-6 h-6 !rounded-full !border-white/40 shadow-none"
+                    imgClassName="rounded-full"
                   />
                   <span>Mi perfil ({currentWorker.firstName})</span>
                 </button>
@@ -226,6 +271,10 @@ export const Navbar: React.FC = () => {
                   <LogOut className="w-4 h-4" />
                   <span>Cerrar sesión</span>
                 </button>
+              </div>
+            ) : isWorkerRegistrationActive ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center text-xs text-amber-900 font-medium">
+                Registro en proceso
               </div>
             ) : (
               <div className="space-y-2">

@@ -8,28 +8,24 @@ service firebase.storage {
     }
 
     // Helper: Checks if user possesses administrator privileges
+    // Only Firebase Custom Claim admin == true authorizes administrative operations
     function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.admin == true ||
-        request.auth.token.role == 'admin' ||
-        request.auth.token.email in [
-          'maestrocerca.mx@gmail.com', 
-          'admin@maestrocerca.mx',
-          'admin@zibata.mx'
-        ]
-      );
+      return request.auth != null &&
+             request.auth.token.admin == true;
     }
 
     // =========================================================================
-    // 1. PUBLIC PORTFOLIO IMAGES
-    // Path: /portafolios/{uid}/{fileName}
+    // 1. PENDING PROFILE PHOTOS (Private, Pre-Moderation)
+    // Path: /profile-photos-pending/{uid}/{fileName}
     // Threat Vectors Addressed:
+    // - Unmoderated / Inappropriate Avatars: READ IS STRICTLY OWNER OR ADMIN ONLY.
+    //   Never publicly accessible or readable by anonymous visitors.
     // - Malware / Script Injection: Strict MIME-type regex image/(jpeg|png|webp).
     // - Storage Exhaustion (DoS): Strictly capped at < 5MB.
-    // - Unauthorized Overwrites: Authenticated worker must own the path (request.auth.uid == uid).
+    // - Path Traversal / Spoofing: request.auth.uid must match target uid.
     // =========================================================================
-    match /portafolios/{uid}/{fileName} {
-      allow read: if true;
+    match /profile-photos-pending/{uid}/{fileName} {
+      allow read: if (isAuthenticated() && request.auth.uid == uid) || isAdmin();
       allow write: if isAuthenticated() 
         && request.auth.uid == uid
         && request.resource.contentType.matches('image/(jpeg|png|webp)')
@@ -38,7 +34,33 @@ service firebase.storage {
     }
 
     // =========================================================================
-    // 2. CONFIDENTIAL VERIFICATION DOCUMENTS (Sensitive INE, Passports, Proofs)
+    // 2. PUBLIC APPROVED PROFILE PHOTOS (Post-Moderation)
+    // Path: /profile-photos-public/{uid}/{fileName}
+    // Threat Vectors Addressed:
+    // - Read: Fully public for verified & approved worker avatars.
+    // - Write / Mutation: ADMIN ONLY (via Admin SDK / controlled endpoint).
+    //   Workers cannot write directly to public avatars without administrative approval.
+    // =========================================================================
+    match /profile-photos-public/{uid}/{fileName} {
+      allow read: if true;
+      allow write, delete: if isAdmin();
+    }
+
+    // =========================================================================
+    // 3. PUBLIC WORK GALLERY PORTFOLIO (Photos of completed jobs)
+    // Path: /portafolios/{folderId}/{fileName}
+    // =========================================================================
+    match /portafolios/{folderId}/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() 
+        && request.auth.uid == folderId
+        && request.resource.contentType.matches('image/(jpeg|png|webp)')
+        && request.resource.size < 5 * 1024 * 1024;
+      allow delete: if (isAuthenticated() && request.auth.uid == folderId) || isAdmin();
+    }
+
+    // =========================================================================
+    // 4. CONFIDENTIAL VERIFICATION DOCUMENTS (Sensitive INE, Passports, Proofs)
     // Path: /verificaciones/{uid}/{fileName}
     // Threat Vectors Addressed:
     // - Identity Theft / PII Data Leakage: READ IS STRICTLY ADMIN-ONLY (isAdmin()).
@@ -60,16 +82,6 @@ service firebase.storage {
         && request.resource.size < 10 * 1024 * 1024;
 
       allow delete: if isAdmin();
-    }
-
-    // Profile photos path (alias to portfolio rules)
-    match /maestros/{uid}/{fileName} {
-      allow read: if true;
-      allow write: if isAuthenticated() 
-        && request.auth.uid == uid
-        && request.resource.contentType.matches('image/(jpeg|png|webp)')
-        && request.resource.size < 5 * 1024 * 1024;
-      allow delete: if (isAuthenticated() && request.auth.uid == uid) || isAdmin();
     }
 
     // Default deny all other paths

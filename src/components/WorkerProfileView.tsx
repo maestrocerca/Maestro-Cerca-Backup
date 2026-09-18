@@ -18,22 +18,41 @@ import {
   Calendar,
   Sparkles,
   User,
-  Wrench
+  Wrench,
+  Flag
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { WorkPhoto } from '../types';
-import { distanceFromZibata } from '../lib/geo';
+import { WorkPhoto, isPubliclyVisible } from '../types';
+import { WorkerAvatar } from './WorkerAvatar';
 
 interface WorkerProfileViewProps {
   workerSlug: string;
 }
 
 export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug }) => {
-  const { getWorkerBySlug, navigateTo, logContactClick, logProfileView, contactarWhatsApp } = useStore();
+  const { 
+    getWorkerBySlug, 
+    navigateTo, 
+    logContactClick, 
+    logProfileView, 
+    contactarWhatsApp,
+    isCatalogLoading,
+    submitProfileReport,
+    showToast,
+    firebaseUser,
+    isAdmin
+  } = useStore();
   const worker = getWorkerBySlug(workerSlug);
 
   const [selectedPhoto, setSelectedPhoto] = useState<WorkPhoto | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Report Modal state
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('Información o datos de contacto falsos');
+  const [reportDetails, setReportDetails] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
 
   useEffect(() => {
     if (worker) {
@@ -42,6 +61,14 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
   }, [worker, logProfileView]);
 
   if (!worker) {
+    if (isCatalogLoading) {
+      return (
+        <div className="max-w-4xl mx-auto px-4 py-24 text-center space-y-4">
+          <div className="w-10 h-10 border-3 border-orange-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-600 font-medium text-sm">Cargando perfil del maestro...</p>
+        </div>
+      );
+    }
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
         <h2 className="text-2xl font-bold text-slate-900">Trabajador no encontrado</h2>
@@ -56,8 +83,43 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
     );
   }
 
+  // Check public visibility & owner/admin authorization
+  const isVisible = isPubliclyVisible(worker);
+  const isOwner = Boolean(
+    firebaseUser && (firebaseUser.uid === worker.id || firebaseUser.uid === worker.userId)
+  );
+  const isOwnerOrAdmin = isOwner || isAdmin;
+
+  // Unapproved or private profiles are blocked for anonymous visitors and non-owners
+  if (!isVisible && !isOwnerOrAdmin) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
+        <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto border border-amber-200">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900">Perfil en revisión</h2>
+        <p className="text-slate-600 max-w-md mx-auto">
+          Este perfil está en revisión o no está disponible públicamente.
+        </p>
+        <button
+          onClick={() => navigateTo({ type: 'search' })}
+          className="px-6 py-2.5 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 transition-colors cursor-pointer"
+        >
+          Volver al directorio
+        </button>
+      </div>
+    );
+  }
+
   const isVerified = worker.verificationStatus === 'verified' || worker.verificado === true;
-  const distKm = distanceFromZibata(worker.lat, worker.lng);
+  const workPhotosList = (worker.workPhotos && worker.workPhotos.length > 0)
+    ? worker.workPhotos
+    : (worker.fotosTrabajos && worker.fotosTrabajos.length > 0)
+      ? worker.fotosTrabajos.map((url, idx) => ({ id: `p-${idx}`, url, title: 'Trabajo realizado', description: '' }))
+      : [];
+  const mainArea = (worker.serviceAreas && worker.serviceAreas.length > 0 && worker.serviceAreas[0])
+    ? worker.serviceAreas[0]
+    : null;
 
   const handleWhatsApp = () => {
     contactarWhatsApp(worker);
@@ -68,10 +130,57 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
     window.location.href = `tel:${worker.phone}`;
   };
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2500);
+  const handleShare = async () => {
+    const canonicalUrl = `${window.location.origin}/trabajador/${encodeURIComponent(worker.slug || worker.id)}`;
+    const shareData = {
+      title: `${worker.firstName} ${worker.lastName} - ${worker.mainTrade} en Querétaro | Maestro Cerca`,
+      text: `Contacta a ${worker.firstName} (${worker.mainTrade}) en Querétaro a través de Maestro Cerca.`,
+      url: canonicalUrl,
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(canonicalUrl);
+      setCopiedLink(true);
+      showToast('Enlace del perfil copiado al portapapeles');
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
+
+  const handleSubmitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportReason.trim()) return;
+
+    setIsSubmittingReport(true);
+    const fullReason = reportDetails.trim() 
+      ? `${reportReason.trim()} - Detalle: ${reportDetails.trim()}`
+      : reportReason.trim();
+
+    const res = await submitProfileReport(worker.id, fullReason);
+    setIsSubmittingReport(false);
+
+    if (res.success) {
+      setReportSuccess(true);
+      showToast(res.message || 'Reporte enviado con éxito. Nuestro equipo lo revisará.');
+      setTimeout(() => {
+        setShowReportModal(false);
+        setReportSuccess(false);
+        setReportDetails('');
+      }, 2000);
+    } else {
+      showToast(res.error || 'Error al enviar el reporte.');
+    }
   };
 
   return (
@@ -88,40 +197,52 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
             <span>Volver a la búsqueda</span>
           </button>
 
-          <button
-            onClick={handleShare}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-orange-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <Share2 className="w-4 h-4" />
-            <span>{copiedLink ? '¡Enlace copiado!' : 'Compartir perfil'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleShare}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-orange-600 p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Compartir perfil"
+            >
+              <Share2 className="w-4 h-4" />
+              <span className="hidden xs:inline">{copiedLink ? '¡Enlace copiado!' : 'Compartir perfil'}</span>
+            </button>
+
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-rose-600 p-2 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
+              title="Reportar usuario"
+            >
+              <Flag className="w-4 h-4" />
+              <span className="hidden xs:inline">Reportar</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-8">
         
+        {/* Visibility Warning Banner for Owner / Admin */}
+        {!isVisible && isOwnerOrAdmin && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start sm:items-center gap-3 shadow-xs">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+            <div className="text-sm">
+              <span className="font-bold">Perfil en revisión o no público:</span> Este perfil no está visible para el público general (está pendiente de aprobación administrativa o marcado como no disponible). Puedes visualizarlo porque eres {isAdmin ? 'administrador' : 'el propietario'}.
+            </div>
+          </div>
+        )}
+
         {/* HEADER HERO CARD */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm relative overflow-hidden">
           
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             
-            {/* Avatar: Real photo for verified, Generic user silhouette for registered */}
+            {/* Avatar: Photo if approved, else generic trade avatar */}
             <div className="relative shrink-0">
-              {isVerified && worker.profilePhoto ? (
-                <img
-                  src={worker.profilePhoto}
-                  alt={`${worker.firstName} ${worker.lastName}`}
-                  className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl object-cover border-2 border-slate-200 shadow-xs"
-                />
-              ) : (
-                <div 
-                  className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl bg-slate-100 border-2 border-slate-200 flex flex-col items-center justify-center text-slate-400 shadow-xs"
-                  title="Trabajador registrado en Maestro Cerca"
-                >
-                  <User className="w-14 h-14 sm:w-16 sm:h-16 text-slate-400" />
-                  <span className="text-[11px] font-semibold text-slate-500 mt-1">Registrado</span>
-                </div>
-              )}
+              <WorkerAvatar
+                worker={worker}
+                alt={`${worker.firstName} ${worker.lastName}`}
+                size="lg"
+              />
 
               {isVerified && (
                 <div 
@@ -144,7 +265,7 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold">
-                    Registrado en Maestro Cerca
+                    Registrado
                   </span>
                 )}
                 <span className="text-xs text-slate-500 flex items-center gap-1">
@@ -169,7 +290,7 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
 
                 <div className="flex items-center gap-1 text-slate-600">
                   <MapPin className="w-4 h-4 text-orange-600 shrink-0" />
-                  <span>A {distKm} km de Zibatá ({worker.serviceAreas?.join(', ') || 'Zibatá y Querétaro'})</span>
+                  <span>{mainArea ? `Zona principal: ${mainArea}` : 'Zona principal no especificada'}</span>
                 </div>
               </div>
 
@@ -187,29 +308,49 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
 
           </div>
 
+          {/* Availability Paused Notice if worker.isAvailable === false */}
+          {worker.isAvailable === false && (
+            <div className="mt-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div>
+                <p className="font-bold">Este trabajador no está disponible temporalmente</p>
+                <p className="text-xs text-amber-800">Actualmente no está recibiendo nuevas solicitudes ni cotizaciones de clientes.</p>
+              </div>
+            </div>
+          )}
+
           {/* Desktop Contact CTA Row */}
           <div className="mt-8 pt-6 border-t border-slate-100 flex flex-wrap items-center gap-3 sm:gap-4">
-            <button
-              id="profile-whatsapp-cta"
-              onClick={handleWhatsApp}
-              className="flex-1 sm:flex-none py-3.5 px-6 bg-green-600 hover:bg-green-700 active:scale-[0.99] text-white font-black text-sm sm:text-base rounded-xl shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer"
-            >
-              <MessageCircle className="w-5 h-5" />
-              <span>Contactar por WhatsApp</span>
-            </button>
+            {worker.isAvailable === false ? (
+              <div className="flex-1 p-3.5 bg-slate-100 rounded-xl text-slate-600 text-xs sm:text-sm font-semibold flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Contacto desactivado temporalmente (el trabajador pausó su disponibilidad)</span>
+              </div>
+            ) : (
+              <>
+                <button
+                  id="profile-whatsapp-cta"
+                  onClick={handleWhatsApp}
+                  className="flex-1 sm:flex-none py-3.5 px-6 bg-green-600 hover:bg-green-700 active:scale-[0.99] text-white font-black text-sm sm:text-base rounded-xl shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  <span>Contactar por WhatsApp</span>
+                </button>
 
-            <button
-              id="profile-phone-cta"
-              onClick={handlePhone}
-              className="py-3.5 px-5 bg-slate-50 hover:bg-slate-100 border border-slate-200 active:scale-[0.99] text-slate-900 font-bold text-sm sm:text-base rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Phone className="w-5 h-5 text-slate-700" />
-              <span>Llamar al {worker.phone}</span>
-            </button>
+                <button
+                  id="profile-phone-cta"
+                  onClick={handlePhone}
+                  className="py-3.5 px-5 bg-slate-50 hover:bg-slate-100 border border-slate-200 active:scale-[0.99] text-slate-900 font-bold text-sm sm:text-base rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Phone className="w-5 h-5 text-slate-700" />
+                  <span>Llamar</span>
+                </button>
+              </>
+            )}
 
             <div className="text-xs text-slate-600 ml-auto flex items-center gap-1.5 font-medium">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
-              <span>Trato directo con el especialista</span>
+              <span className={`w-2 h-2 rounded-full ${worker.isAvailable === false ? 'bg-amber-400' : 'bg-green-500'}`} />
+              <span>{worker.isAvailable === false ? 'Perfil en pausa' : 'Trato directo con el especialista'}</span>
             </div>
           </div>
 
@@ -262,13 +403,13 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
                   </p>
                 </div>
                 <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-                  {worker.workPhotos?.length || 0} fotos
+                  {workPhotosList.length} fotos
                 </span>
               </div>
 
-              {worker.workPhotos && worker.workPhotos.length > 0 ? (
+              {workPhotosList.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  {worker.workPhotos.map((photo) => (
+                  {workPhotosList.map((photo) => (
                     <div
                       key={photo.id}
                       onClick={() => setSelectedPhoto(photo)}
@@ -277,6 +418,9 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
                       <img
                         src={photo.url}
                         alt={photo.title}
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-90 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end text-white">
@@ -357,7 +501,7 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
                     <p className={`font-semibold ${worker.photosReviewed ? 'text-slate-900' : 'text-slate-500'}`}>
                       Fotografías revisadas
                     </p>
-                    <p className="text-[11px] text-slate-600">Muestras de trabajos en Querétaro</p>
+                    <p className="text-[11px] text-slate-600">Muestras de trabajos comprobadas</p>
                   </div>
                 </li>
 
@@ -370,9 +514,9 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
                   </div>
                   <div>
                     <p className={`font-semibold ${worker.identityVerified ? 'text-slate-900' : 'text-slate-500'}`}>
-                      Identidad oficial cotejada
+                      Identidad confirmada
                     </p>
-                    <p className="text-[11px] text-slate-600">INE / Identificación oficial revisada</p>
+                    <p className="text-[11px] text-slate-600">Perfil y datos de contacto comprobados</p>
                   </div>
                 </li>
 
@@ -430,17 +574,29 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
                   {worker.yearsExperience} años en el oficio
                 </p>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Especializado en proyectos residenciales, mantenimiento preventivo y correctivo en Querétaro.
+                  Especializado en proyectos residenciales, mantenimiento preventivo y correctivo.
                 </p>
               </div>
             </section>
 
             {/* 7. AVISO LEGAL DISCRETO */}
-            <div className="p-4 rounded-2xl bg-slate-100/90 border border-slate-200 text-slate-600 text-xs leading-relaxed flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-              <p>
-                <strong>Aviso:</strong> Maestro Cerca facilita el contacto entre clientes y trabajadores independientes. Los acuerdos, precios y ejecución de los trabajos se realizan directamente entre ambas partes.
-              </p>
+            <div className="p-4 rounded-2xl bg-slate-100/90 border border-slate-200 text-slate-600 text-xs leading-relaxed flex flex-col gap-2">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                <p>
+                  <strong>Aviso:</strong> Maestro Cerca facilita el contacto entre clientes y trabajadores independientes. Los acuerdos, precios y ejecución de los trabajos se realizan directamente entre ambas partes.
+                </p>
+              </div>
+              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(true)}
+                  className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-rose-600 font-medium transition-colors cursor-pointer"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  <span>Reportar este perfil o datos sospechosos</span>
+                </button>
+              </div>
             </div>
 
           </div>
@@ -449,23 +605,142 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
 
       </div>
 
+      {/* MODAL: REPORTAR TRABAJADOR */}
+      {showReportModal && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => !isSubmittingReport && setShowReportModal(false)}
+        >
+          <div 
+            className="relative max-w-md w-full bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowReportModal(false)}
+              disabled={isSubmittingReport}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <Flag className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">Reportar perfil</h3>
+                <p className="text-xs text-slate-500">{worker.firstName} {worker.lastName} ({worker.mainTrade})</p>
+              </div>
+            </div>
+
+            {reportSuccess ? (
+              <div className="py-6 text-center space-y-3">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                  <Check className="w-6 h-6" />
+                </div>
+                <h4 className="text-base font-black text-slate-900">Reporte recibido</h4>
+                <p className="text-xs text-slate-600 leading-relaxed max-w-xs mx-auto">
+                  Agradecemos tu reporte. Nuestro equipo de administración lo revisará para mantener la seguridad y confianza en Maestro Cerca.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitReport} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Motivo principal
+                  </label>
+                  <select
+                    value={reportReason}
+                    onChange={(e) => setReportReason(e.target.value)}
+                    disabled={isSubmittingReport}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                  >
+                    <option value="Información o datos de contacto falsos">Información o datos de contacto falsos</option>
+                    <option value="Fotografías no corresponden o son inapropiadas">Fotografías no corresponden o son inapropiadas</option>
+                    <option value="Comportamiento abusivo o spam">Comportamiento abusivo o spam</option>
+                    <option value="Incumplimiento o mala práctica">Incumplimiento o mala práctica</option>
+                    <option value="Cobro indebido o fraude">Cobro indebido o fraude</option>
+                    <option value="Otro motivo">Otro motivo</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Detalles adicionales (opcional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reportDetails}
+                    onChange={(e) => setReportDetails(e.target.value)}
+                    disabled={isSubmittingReport}
+                    placeholder="Describe brevemente la situación para ayudarnos a investigar..."
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 resize-none"
+                  />
+                </div>
+
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Tu reporte es anónimo y confidencial. Se registrará para auditoría del equipo de administración de Maestro Cerca.
+                </p>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(false)}
+                    disabled={isSubmittingReport}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReport}
+                    className="px-5 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSubmittingReport ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Enviando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Flag className="w-3.5 h-3.5" />
+                        <span>Enviar reporte</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* MOBILE STICKY BOTTOM CONTACT BAR */}
       <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 sm:hidden z-30 shadow-2xl">
         <div className="flex items-center gap-2 max-w-md mx-auto">
-          <button
-            onClick={handleWhatsApp}
-            className="flex-1 py-3 px-4 bg-green-600 active:bg-green-700 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-sm"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span>Contactar WhatsApp</span>
-          </button>
-          <button
-            onClick={handlePhone}
-            className="py-3 px-4 bg-slate-100 active:bg-slate-200 text-slate-900 font-bold text-sm rounded-xl flex items-center justify-center gap-1.5"
-          >
-            <Phone className="w-4 h-4" />
-            <span>Llamar</span>
-          </button>
+          {worker.isAvailable === false ? (
+            <div className="w-full py-2.5 px-4 bg-slate-100 rounded-xl text-slate-600 text-xs font-semibold text-center flex items-center justify-center gap-2">
+              <Clock className="w-4 h-4 text-slate-400" />
+              <span>Trabajador no disponible temporalmente</span>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={handleWhatsApp}
+                className="flex-1 py-3 px-4 bg-green-600 active:bg-green-700 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-sm"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Contactar WhatsApp</span>
+              </button>
+              <button
+                onClick={handlePhone}
+                className="py-3 px-4 bg-slate-100 active:bg-slate-200 text-slate-900 font-bold text-sm rounded-xl flex items-center justify-center gap-1.5"
+              >
+                <Phone className="w-4 h-4" />
+                <span>Llamar</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 

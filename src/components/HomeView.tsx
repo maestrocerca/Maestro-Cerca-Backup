@@ -19,7 +19,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { Trade } from '../types';
+import { Trade, isPubliclyVisible } from '../types';
 
 export const HomeView: React.FC = () => {
   const { trades, serviceAreas, workers, navigateTo, trackSearch } = useStore();
@@ -51,34 +51,24 @@ export const HomeView: React.FC = () => {
   // Popular trades for the grid
   const popularTrades = trades.filter((t) => t.popular && t.active);
 
-  // Count verified workers
-  const verifiedCount = workers.filter((w) => w.verificationStatus === 'verified' && w.profileActive).length;
-  const totalWorkersCount = workers.filter((w) => w.profileActive).length;
+  // Count verified and total public available workers
+  const publicWorkers = workers.filter(isPubliclyVisible);
+  const totalWorkersCount = publicWorkers.length;
+  const verifiedCount = publicWorkers.filter((w) => w.verificationStatus === 'verified' || w.verificado === true).length;
 
   return (
     <div className="space-y-16 lg:space-y-24 pb-20">
       
       {/* 1. HERO SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-orange-50/40 via-white to-[#FAFAFA] pt-10 sm:pt-16 pb-16 lg:pb-24 border-b border-slate-200">
+      <section className="relative overflow-hidden bg-gradient-to-b from-orange-50/40 via-white to-[#FAFAFA] pt-[100px] pb-[90px] border-b border-slate-200 mb-[84px]">
         
         {/* Subtle decorative background accents */}
         <div className="absolute inset-0 bg-[radial-gradient(#ea580c_1px,transparent_1px)] [background-size:28px_28px] opacity-10 pointer-events-none" />
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
-          
-          {/* Hyperlocal pill */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200/80 text-xs sm:text-sm font-semibold mb-6 shadow-xs">
-            <span className="flex h-2 w-2 rounded-full bg-orange-600 animate-pulse" />
-            <span>Directorio de oficios en Santiago de Querétaro y alrededores</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.12] mb-5">
-            Encuentra trabajadores de <span className="underline decoration-orange-400 decoration-wavy decoration-2">confianza</span> cerca de ti
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.12] mb-8 sm:mb-10">
+            Encuentra trabajadores de <span className="text-orange-600">confianza</span> cerca de ti
           </h1>
-
-          <p className="text-base sm:text-xl text-slate-600 max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
-            Encuentra albañiles, plomeros, electricistas y otros especialistas en Querétaro. Consulta su experiencia, trabajos y nivel de verificación antes de contactarlos.
-          </p>
 
           {/* MAIN SEARCH BOX */}
           <div className="max-w-3xl mx-auto bg-white p-3 sm:p-4 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 text-left">
@@ -119,7 +109,7 @@ export const HomeView: React.FC = () => {
                     onChange={(e) => setSelectedArea(e.target.value)}
                     className="w-full pl-10 pr-8 py-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-slate-800 font-medium text-sm sm:text-base focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all appearance-none cursor-pointer"
                   >
-                    <option value="">Todas las zonas de Querétaro</option>
+                    <option value="">Todas las ubicaciones</option>
                     {serviceAreas.filter((a) => a.active).map((area) => (
                       <option key={area.id} value={area.name}>
                         {area.name} ({area.municipality})
@@ -173,7 +163,7 @@ export const HomeView: React.FC = () => {
       </section>
 
       {/* 2. OFICIOS POPULARES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="max-w-7xl mx-auto px-8 mb-[70px]">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
           <div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
@@ -222,67 +212,9 @@ export const HomeView: React.FC = () => {
         </div>
       </section>
 
-      {/* 3. ¿CÓMO FUNCIONA? */}
-      <section className="bg-slate-100/70 py-16 sm:py-20 border-y border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
-              ¿Cómo funciona Maestro Cerca?
-            </h2>
-            <p className="text-slate-600 text-sm sm:text-base mt-2">
-              Tres pasos simples para conectar con el trabajador adecuado, sin intermediarios ni cargos sorpresa.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            
-            {/* Step 1 */}
-            <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs relative">
-              <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-700 font-black text-lg flex items-center justify-center mb-6">
-                1
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">
-                Busca lo que necesitas
-              </h3>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                Selecciona el oficio y la zona donde necesitas ayuda en Querétaro (Juriquilla, Centro, Corregidora, Zibatá, etc.).
-              </p>
-            </div>
-
-            {/* Step 2 */}
-            <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs relative">
-              <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-700 font-black text-lg flex items-center justify-center mb-6">
-                2
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">
-                Compara trabajadores
-              </h3>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                Consulta los años de experiencia, fotos reales de trabajos anteriores y las señales de verificación que tiene cada perfil.
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs relative">
-              <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-700 font-black text-lg flex items-center justify-center mb-6">
-                3
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">
-                Contacta directamente
-              </h3>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                Habla con el trabajador por WhatsApp o teléfono y acuerda directamente las fechas, el presupuesto y los detalles de tu trabajo.
-              </p>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* 4. SECCIÓN SOBRE CONFIANZA */}
+      {/* SECCIÓN SOBRE CONFIANZA */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-slate-900 text-white rounded-3xl p-8 sm:p-12 lg:p-16 relative overflow-hidden border border-slate-800">
+        <div className="bg-slate-900 text-white rounded-3xl pt-[65px] pl-16 pb-16 pr-8 sm:pr-12 lg:pr-16 relative overflow-hidden border border-slate-800">
           
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             
@@ -376,14 +308,14 @@ export const HomeView: React.FC = () => {
 
       {/* 5. CTA DESTACADO PARA TRABAJADORES */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-r from-slate-900 to-slate-950 text-white rounded-3xl p-8 sm:p-12 lg:p-14 text-center sm:text-left relative overflow-hidden shadow-lg border border-slate-800">
+        <div className="bg-black text-white rounded-3xl pt-[56px] px-8 sm:px-12 lg:px-14 pb-8 sm:pb-12 lg:pb-14 text-center sm:text-left relative overflow-hidden shadow-lg border border-slate-800">
           
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
             
             <div className="md:col-span-8 space-y-4">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-950 text-orange-300 border border-orange-800/60 text-xs font-semibold">
                 <Users className="w-3.5 h-3.5" />
-                <span>Comunidad de trabajadores en Querétaro</span>
+                <span>Comunidad de trabajadores y especialistas de oficios</span>
               </div>
 
               <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">

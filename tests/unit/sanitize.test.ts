@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeText, sanitizeRecord, checkRateLimit } from '../../src/lib/sanitize';
+import { sanitizeText, sanitizeRecord, checkRateLimit, removeUndefinedFields } from '../../src/lib/sanitize';
 
 describe('Sanitization & Rate Limiting Utility', () => {
   describe('sanitizeText', () => {
@@ -75,6 +75,65 @@ describe('Sanitization & Rate Limiting Utility', () => {
 
       expect(checkRateLimit(keyA, 1000)).toBe(true);
       expect(checkRateLimit(keyB, 1000)).toBe(true);
+    });
+  });
+
+  describe('removeUndefinedFields (Firestore payload safety)', () => {
+    it('removes top-level undefined fields without mutating original object', () => {
+      const payload = {
+        nombre: 'Carlos López',
+        phoneVerified: false,
+        phoneVerifiedAt: undefined,
+        phoneVerificationMethod: undefined,
+        nivel: 'Aspirante',
+        aprobado: false,
+      };
+
+      const clean = removeUndefinedFields(payload);
+      expect('phoneVerifiedAt' in clean).toBe(false);
+      expect('phoneVerificationMethod' in clean).toBe(false);
+      expect(clean.phoneVerified).toBe(false);
+      expect(clean.nombre).toBe('Carlos López');
+      expect(clean.nivel).toBe('Aspirante');
+      expect(clean.aprobado).toBe(false);
+    });
+
+    it('preserves null, boolean false, number 0, and empty string fields', () => {
+      const payload = {
+        pendingProfilePhotoPath: null,
+        phoneVerified: false,
+        yearsExperience: 0,
+        fotoUrl: '',
+        tags: [],
+        ignored: undefined,
+      };
+
+      const clean = removeUndefinedFields(payload);
+      expect(clean.pendingProfilePhotoPath).toBeNull();
+      expect(clean.phoneVerified).toBe(false);
+      expect(clean.yearsExperience).toBe(0);
+      expect(clean.fotoUrl).toBe('');
+      expect(clean.tags).toEqual([]);
+      expect('ignored' in clean).toBe(false);
+    });
+
+    it('recursively cleans nested objects and arrays of objects', () => {
+      const payload = {
+        info: {
+          trade: 'Plomero',
+          subTrade: undefined,
+        },
+        items: [
+          { id: 1, title: 'Bomba', note: undefined },
+          { id: 2, title: 'Tubería' },
+        ],
+      };
+
+      const clean = removeUndefinedFields(payload);
+      expect(clean.info.trade).toBe('Plomero');
+      expect('subTrade' in clean.info).toBe(false);
+      expect(clean.items[0].title).toBe('Bomba');
+      expect('note' in clean.items[0]).toBe(false);
     });
   });
 });

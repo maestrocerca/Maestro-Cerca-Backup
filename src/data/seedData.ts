@@ -115,6 +115,11 @@ export const INITIAL_SERVICE_AREAS: ServiceArea[] = [
   { id: 'a-santa-rosa', name: 'Santa Rosa Jáuregui', municipality: 'Querétaro', state: 'Querétaro', active: true },
   { id: 'a-el-pueblito', name: 'El Pueblito', municipality: 'Corregidora', state: 'Querétaro', active: true },
   { id: 'a-carretas', name: 'Carretas / Calesa', municipality: 'Querétaro', state: 'Querétaro', active: true },
+  { id: 'a-san-juan-del-rio', name: 'San Juan del Río', municipality: 'San Juan del Río', state: 'Querétaro', active: true },
+  { id: 'a-huimilpan', name: 'Huimilpan', municipality: 'Huimilpan', state: 'Querétaro', active: true },
+  { id: 'a-tequisquiapan', name: 'Tequisquiapan', municipality: 'Tequisquiapan', state: 'Querétaro', active: true },
+  { id: 'a-colon', name: 'Colón', municipality: 'Colón', state: 'Querétaro', active: true },
+  { id: 'a-pedro-escobedo', name: 'Pedro Escobedo', municipality: 'Pedro Escobedo', state: 'Querétaro', active: true },
 ];
 
 const RAW_WORKERS: any[] = [
@@ -127,7 +132,7 @@ const RAW_WORKERS: any[] = [
     email: 'rogelio.morales.qro@gmail.com',
     phone: '4421894520',
     whatsapp: '524421894520',
-    profilePhoto: 'https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?auto=format&fit=crop&w=400&q=80',
+    profilePhoto: 'https://images.unsplash.com/photo-1537511446984-935f663eb1f4?auto=format&fit=crop&w=400&q=80',
     mainTrade: 'Albañil',
     secondaryTrades: ['Instalador de pisos', 'Impermeabilizador'],
     services: [
@@ -549,7 +554,7 @@ const RAW_WORKERS: any[] = [
     workPhotos: [
       {
         id: 'p-cb-1',
-        url: 'https://images.unsplash.com/photo-1558441719-8b36873523ef?auto=format&fit=crop&w=800&q=80',
+        url: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=800&q=80',
         title: 'Instalación de lámpara arbotante',
         description: 'Luminaria exterior en fachada con sensor de movimiento.',
       },
@@ -1046,7 +1051,7 @@ const RAW_WORKERS: any[] = [
     workPhotos: [
       {
         id: 'p-rg-1',
-        url: 'https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?auto=format&fit=crop&w=800&q=80',
+        url: 'https://images.unsplash.com/photo-1632759145351-1d592919f522?auto=format&fit=crop&w=800&q=80',
         title: 'Membrana prefabricada en azotea',
         description: 'Aplicación con soplete y sellado perimetral en Juriquilla.',
       },
@@ -1071,7 +1076,7 @@ export const enrichWorkerToMaestro = (raw: any): Maestro => {
   const nombre = raw.nombre || `${raw.firstName || ''} ${raw.lastName || ''}`.trim() || 'Maestro Especialista';
   const oficio = raw.oficio || raw.mainTrade || 'Mantenimiento general';
   const bio = raw.bio || raw.description || '';
-  const fotoUrl = raw.fotoUrl || raw.profilePhoto || 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&w=400&q=80';
+  const fotoUrl = raw.fotoUrl || raw.profilePhoto || '';
   const cleanPhone = (raw.phone || '4420000000').replace(/\D/g, '');
   const rawWa = (raw.whatsapp || `52${cleanPhone}`).replace(/\D/g, '');
   const telefonoWhatsApp = rawWa.startsWith('52') ? rawWa : `52${rawWa}`;
