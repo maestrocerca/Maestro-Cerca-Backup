@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Search, 
   MapPin, 
@@ -18,8 +18,10 @@ import {
   User,
   Wrench
 } from 'lucide-react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useStore } from '../context/StoreContext';
-import { Worker, isPubliclyVisible } from '../types';
+import { Worker } from '../types';
 import { WorkerAvatar } from './WorkerAvatar';
 
 interface SearchResultsViewProps {
@@ -41,6 +43,43 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
   const [minExperience, setMinExperience] = useState<number>(0);
   const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
 
+  // SERVER-SIDE QUERY: Filter profiles at the Firestore server level
+  // Conditions: status == 'active' and onboardingIncomplete == false
+  const [serverWorkers, setServerWorkers] = useState<Worker[]>([]);
+  const [isLoadingServer, setIsLoadingServer] = useState<boolean>(true);
+
+  useEffect(() => {
+    setIsLoadingServer(true);
+    const maestrosRef = collection(db, 'maestros');
+    const baseServerQuery = query(
+      maestrosRef,
+      where('status', '==', 'active'),
+      where('onboardingIncomplete', '==', false),
+      where('aprobado', '==', true)
+    );
+
+    const unsubscribe = onSnapshot(
+      baseServerQuery,
+      (snapshot) => {
+        const loaded: Worker[] = [];
+        snapshot.forEach((docSnap) => {
+          loaded.push({
+            ...(docSnap.data() as Worker),
+            id: docSnap.id,
+          });
+        });
+        setServerWorkers(loaded);
+        setIsLoadingServer(false);
+      },
+      (error) => {
+        console.warn('[SearchResultsView] Server-side Firestore query fallback:', error);
+        setIsLoadingServer(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
   // Update filters when props change
   React.useEffect(() => {
     if (initialTrade) setTradeFilter(initialTrade);
@@ -52,13 +91,12 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
     trackSearch(trade || undefined, area || undefined);
   };
 
-  // Filter and sort workers
+  // Filter and sort workers directly from server-side query results
   const filteredWorkers = useMemo(() => {
-    return workers
-      .filter((w) => {
-        // Canonical public visibility check (approved, available, onboarding complete, not draft)
-        if (!isPubliclyVisible(w)) return false;
+    const candidateWorkers = serverWorkers.length > 0 || !isLoadingServer ? serverWorkers : workers;
 
+    return candidateWorkers
+      .filter((w) => {
         // Trade filter
         if (tradeFilter) {
           const matchesMain = (w.mainTrade || w.oficio || '').toLowerCase() === tradeFilter.toLowerCase();

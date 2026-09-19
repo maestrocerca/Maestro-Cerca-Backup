@@ -115,11 +115,17 @@ export const WorkerRegisterView: React.FC = () => {
   // Step 4: Work Areas (EMPTY by default - no Querétaro or Zibatá pre-assigned!)
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
 
-  // Step 5: Photographs
+  // Step 5: Photographs - Resilient Local File State
   const [profilePhotoUrl, setProfilePhotoUrl] = useState('');
   const [pendingProfileFile, setPendingProfileFile] = useState<File | null>(null);
   const [profilePreviewUrl, setProfilePreviewUrl] = useState<string>('');
-  const [pendingWorkFiles, setPendingWorkFiles] = useState<{ file: File; previewUrl: string; title: string }[]>([]);
+  const [pendingWorkFiles, setPendingWorkFiles] = useState<{ file: File; previewUrl: string; title: string; failed?: boolean; uploadedUrl?: string }[]>([]);
+
+  // Resilient Upload Failure & Retry State
+  const [hasProfileUploadFailed, setHasProfileUploadFailed] = useState(false);
+  const [hasWorkPhotosUploadFailed, setHasWorkPhotosUploadFailed] = useState(false);
+  const [isRetryingUpload, setIsRetryingUpload] = useState(false);
+  const [uploadRetryMessage, setUploadRetryMessage] = useState('');
 
   // Submission & Status
   const [createdWorker, setCreatedWorker] = useState<Worker | null>(null);
@@ -711,19 +717,24 @@ export const WorkerRegisterView: React.FC = () => {
               setUploadStatusText('Subiendo foto de perfil para revisión...');
               const uploadResult = await uploadWorkerProfileImage(targetUserId, pendingProfileFile);
               await submitPendingProfilePhoto(targetUserId, uploadResult.storagePath);
+              setHasProfileUploadFailed(false);
             } catch (pErr: any) {
               photoUploadFailed = true;
+              setHasProfileUploadFailed(true);
               console.error('[Storage Error - Pending Profile Photo]:', pErr);
             }
           }
 
           // 2. Upload work photos if selected
           if (pendingWorkFiles.length > 0) {
-            for (let i = 0; i < pendingWorkFiles.length; i++) {
-              const item = pendingWorkFiles[i];
+            const updatedPending = [...pendingWorkFiles];
+            for (let i = 0; i < updatedPending.length; i++) {
+              const item = updatedPending[i];
               try {
                 setUploadStatusText(`Subiendo foto ${i + 1} de ${pendingWorkFiles.length}...`);
                 const uploaded = await uploadWorkerWorkPhoto(targetUserId, item.file, item.title, i);
+                item.uploadedUrl = uploaded.url;
+                item.failed = false;
                 uploadedWorkPhotos.push({
                   id: `p-${Date.now()}-${i}`,
                   url: uploaded.url,
@@ -731,6 +742,8 @@ export const WorkerRegisterView: React.FC = () => {
                 });
               } catch (wErr: any) {
                 photoUploadFailed = true;
+                item.failed = true;
+                setHasWorkPhotosUploadFailed(true);
                 console.error(`[Storage Error - Work Photo ${i}]:`, {
                   code: wErr?.code,
                   message: wErr?.message,
@@ -739,6 +752,7 @@ export const WorkerRegisterView: React.FC = () => {
                 });
               }
             }
+            setPendingWorkFiles(updatedPending);
           }
 
           setIsUploading(false);
@@ -769,7 +783,7 @@ export const WorkerRegisterView: React.FC = () => {
         trackGenericEvent('registro_trabajador_completado');
 
         if (photoUploadFailed) {
-          showToast('Perfil guardado con éxito. Algunas fotografías no se pudieron subir y puedes agregarlas desde tu panel de control.');
+          showToast('Perfil guardado con éxito. Algunas fotografías no se pudieron subir por problemas de conexión; puedes reintentar la subida ahora mismo.');
         }
 
         setIsWorkerRegistrationActive(false);
@@ -784,6 +798,86 @@ export const WorkerRegisterView: React.FC = () => {
       setIsUploading(false);
       setIsSubmitting(false);
       setUploadStatusText('');
+    }
+  };
+
+  // Resilient Retry Upload Function: Re-executes failed uploads without requiring re-selection of files
+  const handleRetryUploads = async () => {
+    const targetWorker = createdWorker;
+    if (!targetWorker || !auth.currentUser) return;
+    const targetUserId = targetWorker.userId || auth.currentUser.uid;
+
+    setIsRetryingUpload(true);
+    setUploadRetryMessage('Reintentando subir fotografías...');
+    let anyStillFailed = false;
+
+    // 1. Retry profile photo if it failed
+    if (hasProfileUploadFailed && pendingProfileFile) {
+      try {
+        setUploadRetryMessage('Subiendo foto de perfil...');
+        const uploadResult = await uploadWorkerProfileImage(targetUserId, pendingProfileFile);
+        await submitPendingProfilePhoto(targetUserId, uploadResult.storagePath);
+        setHasProfileUploadFailed(false);
+        setCreatedWorker((prev) => prev ? { ...prev, profilePhotoReviewStatus: 'pending' } : prev);
+      } catch (err: any) {
+        console.error('[Retry Profile Photo Failed]:', err);
+        anyStillFailed = true;
+      }
+    }
+
+    // 2. Retry work photos that failed
+    const hasFailedWorkPhotos = pendingWorkFiles.some((item) => item.failed && !item.uploadedUrl);
+    if (hasFailedWorkPhotos) {
+      const newlyUploaded: WorkPhoto[] = [];
+      const updatedPendingList = [...pendingWorkFiles];
+
+      for (let i = 0; i < updatedPendingList.length; i++) {
+        const item = updatedPendingList[i];
+        if (item.failed && !item.uploadedUrl) {
+          try {
+            setUploadRetryMessage(`Subiendo foto ${i + 1}...`);
+            const uploaded = await uploadWorkerWorkPhoto(targetUserId, item.file, item.title, i);
+            item.uploadedUrl = uploaded.url;
+            item.failed = false;
+            newlyUploaded.push({
+              id: `p-${Date.now()}-${i}`,
+              url: uploaded.url,
+              title: uploaded.title,
+            });
+          } catch (err: any) {
+            console.error(`[Retry Work Photo ${i} Failed]:`, err);
+            anyStillFailed = true;
+          }
+        }
+      }
+
+      setPendingWorkFiles(updatedPendingList);
+
+      if (newlyUploaded.length > 0) {
+        const mergedPhotos = [...(targetWorker.workPhotos || []), ...newlyUploaded];
+        try {
+          await updateWorkerProfile(targetWorker.id, {
+            workPhotos: mergedPhotos,
+            fotosTrabajos: mergedPhotos.map((p) => p.url),
+          });
+          setCreatedWorker((prev) => prev ? { ...prev, workPhotos: mergedPhotos } : prev);
+        } catch (updateErr) {
+          console.warn('Could not update worker profile photos on retry:', updateErr);
+        }
+      }
+
+      if (!updatedPendingList.some((item) => item.failed)) {
+        setHasWorkPhotosUploadFailed(false);
+      }
+    }
+
+    setIsRetryingUpload(false);
+    setUploadRetryMessage('');
+
+    if (!anyStillFailed) {
+      showToast('¡Fotografías subidas exitosamente!');
+    } else {
+      showToast('No se pudieron subir algunos archivos por problemas de red. Puedes volver a intentar.');
     }
   };
 
@@ -1884,6 +1978,61 @@ export const WorkerRegisterView: React.FC = () => {
                     Para que tu perfil pueda ser activado en el directorio público, deberás validar tu número celular mediante código SMS desde tu panel de trabajador.
                   </p>
                 </div>
+              </div>
+            )}
+
+            {/* Resilient File Upload Retry Card if uploads failed */}
+            {(hasProfileUploadFailed || hasWorkPhotosUploadFailed || pendingWorkFiles.some((f) => f.failed)) && (
+              <div className="p-4 sm:p-5 bg-amber-50 border-2 border-amber-300 rounded-2xl text-left max-w-md mx-auto space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0 mt-0.5">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-amber-950">
+                      Falla al subir fotografías por conexión o tiempo de espera
+                    </h4>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Tus archivos siguen en memoria. La subida a Storage falló temporalmente, pero puedes reintentar ahora mismo sin volver a buscarlos ni abrir el explorador de archivos.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Thumbnails of pending files */}
+                <div className="flex items-center gap-2 overflow-x-auto py-1">
+                  {hasProfileUploadFailed && profilePreviewUrl && (
+                    <div className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-amber-400 shrink-0">
+                      <img src={profilePreviewUrl} alt="Foto perfil" className="w-full h-full object-cover" />
+                      <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-white text-center font-bold">Perfil</span>
+                    </div>
+                  )}
+                  {pendingWorkFiles.filter((f) => f.failed).map((wf, idx) => (
+                    <div key={idx} className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-amber-400 shrink-0">
+                      <img src={wf.previewUrl} alt={wf.title} className="w-full h-full object-cover" />
+                      <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-white text-center font-bold">Trabajo</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  id="btn-retry-upload"
+                  disabled={isRetryingUpload}
+                  onClick={handleRetryUploads}
+                  className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {isRetryingUpload ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>{uploadRetryMessage || 'Reintentando subida...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Reintentar subida</span>
+                    </>
+                  )}
+                </button>
               </div>
             )}
 

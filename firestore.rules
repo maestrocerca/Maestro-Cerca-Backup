@@ -55,12 +55,17 @@ service cloud.firestore {
       // Create: Authenticated users can register with initial state strictly constrained.
       // Incoming data MUST have aprobado == false and verificado == false.
       // Strictly enforce that maestroId equals authenticated user's UID (1 human = 1 UID = 1 doc).
+      // ANTI-FORGERY: If phoneVerified is claimed as true, request.auth.token.phone_number MUST NOT be null.
       allow create: if (
         isAuthenticated() && 
         request.auth.uid == maestroId &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.aprobado == false &&
-        request.resource.data.verificado == false
+        request.resource.data.verificado == false &&
+        (
+          request.resource.data.get('phoneVerified', false) != true ||
+          request.auth.token.phone_number != null
+        )
       ) || isAdmin();
 
       // Update: 

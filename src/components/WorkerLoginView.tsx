@@ -200,10 +200,26 @@ export const WorkerLoginView: React.FC = () => {
           setError('No encontramos un perfil de trabajador activo asociado a este número. Por favor regístrate como trabajador.');
         }
       } else {
-        setError(res.error || 'Código incorrecto. Revisa el SMS e intenta de nuevo.');
+        if (
+          res.error === 'auth/credential-already-in-use' ||
+          res.error?.includes('credential-already-in-use') ||
+          res.error?.toLowerCase().includes('ya está vinculado')
+        ) {
+          setError('Este número celular ya está vinculado a otra cuenta');
+        } else {
+          setError(res.error || 'Código incorrecto. Revisa el SMS e intenta de nuevo.');
+        }
       }
     } catch (err: any) {
-      setError(err?.message || 'Error al validar el código SMS.');
+      if (
+        err?.code === 'auth/credential-already-in-use' ||
+        err?.message?.includes('credential-already-in-use') ||
+        String(err?.message || '').toLowerCase().includes('ya está vinculado')
+      ) {
+        setError('Este número celular ya está vinculado a otra cuenta');
+      } else {
+        setError(err?.message || 'Error al validar el código SMS.');
+      }
     } finally {
       setIsLoading(false);
     }

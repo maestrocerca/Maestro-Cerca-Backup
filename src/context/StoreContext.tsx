@@ -1001,8 +1001,56 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     try {
-      const userCredential = await confirmationResult.confirm(cleanCode);
-      const user = userCredential.user;
+      let user: FirebaseUser;
+
+      // IDENTITY INVARIANT FOR FACEBOOK AUTHENTICATED USERS:
+      // When an authenticated Facebook user verifies their phone number by SMS,
+      // use linkWithCredential(auth.currentUser, credential) exclusively instead of creating a new session with signInWithPhoneNumber / confirmationResult.confirm().
+      // This strictly guarantees that the original UID is preserved intact at all times.
+      const currentAuthUser = auth.currentUser;
+      const isFacebookUser = Boolean(
+        currentAuthUser &&
+        currentAuthUser.providerData?.some((p) => p.providerId === 'facebook.com')
+      );
+
+      if (currentAuthUser && isFacebookUser) {
+        const originalUid = currentAuthUser.uid;
+        const credential = PhoneAuthProvider.credential(confirmationResult.verificationId, cleanCode);
+        try {
+          const userCredential = await linkWithCredential(currentAuthUser, credential);
+          user = userCredential.user;
+          // Invariant verification: original UID must remain identical
+          if (user.uid !== originalUid) {
+            console.error('[Identity Invariant Broken] UID mismatch after linkWithCredential:', { originalUid, newUid: user.uid });
+          }
+          setFirebaseUser(user);
+        } catch (linkErr: any) {
+          console.error('[Phone Linking with Facebook User Error]:', linkErr);
+          if (
+            linkErr?.code === 'auth/credential-already-in-use' ||
+            linkErr?.code === 'auth/account-exists-with-different-credential' ||
+            String(linkErr?.message || '').includes('credential-already-in-use')
+          ) {
+            return {
+              success: false,
+              error: 'Este número celular ya está vinculado a otra cuenta',
+            };
+          }
+          if (linkErr?.code === 'auth/provider-already-linked') {
+            return { success: false, error: 'Este número celular ya se encuentra vinculado a tu perfil.' };
+          }
+          if (linkErr?.code === 'auth/invalid-verification-code') {
+            return { success: false, error: 'Código incorrecto. Verifica los 6 dígitos recibidos por SMS.' };
+          }
+          return {
+            success: false,
+            error: linkErr?.message || 'Error al vincular el número celular a tu cuenta.',
+          };
+        }
+      } else {
+        const userCredential = await confirmationResult.confirm(cleanCode);
+        user = userCredential.user;
+      }
 
       // CRITICAL: Check if authenticated user is an administrator
       const tokenRes = await user.getIdTokenResult().catch(() => null);
@@ -1201,7 +1249,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.warn('Firebase Phone Auth confirm error:', err.code, err.message);
 
       let userFriendlyError = 'Código incorrecto. Revisa el SMS e intenta de nuevo.';
-      if (err.code === 'auth/invalid-verification-code') {
+      if (
+        err.code === 'auth/credential-already-in-use' ||
+        err.code === 'auth/account-exists-with-different-credential' ||
+        String(err?.message || '').includes('credential-already-in-use')
+      ) {
+        userFriendlyError = 'Este número celular ya está vinculado a otra cuenta';
+      } else if (err.code === 'auth/invalid-verification-code') {
         userFriendlyError = 'Código incorrecto. Verifica los 6 dígitos recibidos.';
       } else if (err.code === 'auth/code-expired') {
         userFriendlyError = 'Código vencido. Por favor solicita un nuevo código por SMS.';
@@ -1854,11 +1908,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (
         err.code === 'auth/credential-already-in-use' || 
-        err.code === 'auth/account-exists-with-different-credential'
+        err.code === 'auth/account-exists-with-different-credential' ||
+        String(err?.message || '').includes('credential-already-in-use')
       ) {
         return {
           success: false,
-          error: 'Este número ya está asociado a otra cuenta de Maestro Cerca.',
+          error: 'Este número celular ya está vinculado a otra cuenta',
         };
       }
 
@@ -2785,7 +2840,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         maestros.map((m) => (m.telefono || m.phone || m.whatsapp || '').replace(/\D/g, '').slice(-10)).filter(Boolean)
       );
 
-      const batch = writeBatch(db);
+      let batch = writeBatch(db);
       let batchOps = 0;
       const addedToLocal: Maestro[] = [];
 
@@ -2818,8 +2873,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addedToLocal.push(cleanLeadDoc as Maestro);
         imported++;
 
-        if (batchOps >= 450) {
+        if (batchOps >= 300) {
           await batch.commit();
+          batch = writeBatch(db);
           batchOps = 0;
         }
       }

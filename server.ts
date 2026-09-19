@@ -546,8 +546,8 @@ async function startServer() {
           res.status(500).json({
             success: false,
             step: "delete-auth-user",
+            error: delErr?.message || "No se pudo eliminar el usuario de Firebase Authentication.",
             code: delErr?.code || "auth/delete-user-failed",
-            error: "No se pudo eliminar el usuario de Firebase Authentication.",
             details: delErr?.message,
           });
           return;
