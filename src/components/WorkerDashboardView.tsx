@@ -1388,7 +1388,7 @@ export const WorkerDashboardView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Apellidos</label>
+                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Primer apellido</label>
                   <input
                     type="text"
                     value={formData.lastName}

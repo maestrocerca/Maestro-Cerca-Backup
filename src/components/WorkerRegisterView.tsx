@@ -596,7 +596,7 @@ export const WorkerRegisterView: React.FC = () => {
       }
 
       if (!lastName.trim()) {
-        setGeneralError('Por favor escribe tus apellidos.');
+        setGeneralError('Por favor escribe tu primer apellido.');
         setStep(2);
         setIsSubmitting(false);
         return;
@@ -1254,12 +1254,12 @@ export const WorkerRegisterView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                    Apellidos <span className="text-red-500">*</span>
+                    Primer apellido <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Ej. Sánchez Morales"
+                    placeholder="Ej. Sánchez"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold focus:bg-white focus:outline-hidden focus:border-orange-500"
