@@ -127,14 +127,14 @@ export const HomeView: React.FC = () => {
     <div className="space-y-16 lg:space-y-24 pb-20">
       
       {/* 1. HERO SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-orange-50/40 via-white to-[#FAFAFA] pt-[100px] pb-[90px] border-b border-slate-200 mb-[84px]">
-        
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#0C2340] via-[#12315e] to-[#FAFAFA] pt-[100px] pb-[56px] mb-[84px]">
+
         {/* Subtle decorative background accents */}
-        <div className="absolute inset-0 bg-[radial-gradient(#ea580c_1px,transparent_1px)] [background-size:28px_28px] opacity-10 pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:28px_28px] opacity-[0.06] pointer-events-none" />
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.12] mb-8 sm:mb-10">
-            Encuentra trabajadores de <span className="text-orange-600">confianza</span> cerca de ti
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.12] mb-8 sm:mb-10 drop-shadow-sm">
+            Encuentra trabajadores de <span className="text-orange-400">confianza</span> cerca de ti
           </h1>
 
           {/* MAIN SEARCH BOX */}
@@ -235,6 +235,40 @@ export const HomeView: React.FC = () => {
             </form>
           </div>
 
+          {/* COMPACT OFICIOS POPULARES — right below the search box, superprof-style density */}
+          <div className="max-w-3xl mx-auto mt-5">
+            <div className="flex items-center justify-between mb-2.5 px-1">
+              <span className="text-xs font-bold text-white/70 uppercase tracking-wider">Oficios populares</span>
+              <button
+                onClick={() => navigateTo({ type: 'search' })}
+                className="inline-flex items-center gap-1 text-orange-300 hover:text-orange-200 font-bold text-xs cursor-pointer"
+              >
+                <span>Ver todos los oficios</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {popularTrades.map((trade) => (
+                <button
+                  key={trade.id}
+                  id={`trade-card-${trade.slug}`}
+                  onClick={() => {
+                    trackSearch(trade.name, undefined);
+                    navigateTo({ type: 'search', trade: trade.name });
+                  }}
+                  className="group flex items-center gap-2 pl-2 pr-3.5 py-2 rounded-full bg-white hover:bg-orange-50 border border-white/10 hover:border-orange-300 shadow-sm transition-all duration-150 cursor-pointer"
+                >
+                  <span className="w-7 h-7 rounded-full bg-orange-50 group-hover:bg-orange-600 group-hover:text-white text-orange-600 flex items-center justify-center transition-colors shrink-0 [&_svg]:w-3.5 [&_svg]:h-3.5">
+                    {getTradeIcon(trade.iconName)}
+                  </span>
+                  <span className="font-bold text-slate-800 text-xs sm:text-sm group-hover:text-orange-700 transition-colors">
+                    {trade.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -266,56 +300,6 @@ export const HomeView: React.FC = () => {
           </div>
         </section>
       )}
-
-      {/* 2. OFICIOS POPULARES */}
-      <section className="max-w-7xl mx-auto px-8 mb-[70px]">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Oficios populares en Maestro Cerca
-            </h2>
-            <p className="text-slate-600 text-sm sm:text-base mt-1">
-              Selecciona una especialidad para ver los trabajadores disponibles
-            </p>
-          </div>
-          <button
-            onClick={() => navigateTo({ type: 'search' })}
-            className="inline-flex items-center gap-1.5 text-orange-600 hover:text-orange-700 font-bold text-sm hover:underline cursor-pointer"
-          >
-            <span>Ver todos los oficios</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          {popularTrades.map((trade) => {
-            return (
-              <div
-                key={trade.id}
-                id={`trade-card-${trade.slug}`}
-                onClick={() => {
-                  trackSearch(trade.name, undefined);
-                  navigateTo({ type: 'search', trade: trade.name });
-                }}
-                className="group p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 hover:border-orange-300 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between"
-              >
-                <div className="w-12 h-12 rounded-xl bg-orange-50 group-hover:bg-orange-600 group-hover:text-white text-orange-600 flex items-center justify-center transition-colors mb-4">
-                  {getTradeIcon(trade.iconName)}
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-base sm:text-lg group-hover:text-orange-600 transition-colors">
-                    {trade.name}
-                  </h3>
-                  <p className="text-xs text-orange-600 group-hover:text-orange-700 font-semibold mt-1 flex items-center gap-1">
-                    <span>Explorar</span>
-                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
 
       {/* SECCIÓN SOBRE CONFIANZA */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

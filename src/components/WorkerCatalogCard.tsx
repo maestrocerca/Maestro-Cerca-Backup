@@ -1,19 +1,21 @@
 import React from 'react';
-import { MapPin, CheckCircle2, Images } from 'lucide-react';
+import { MapPin, CheckCircle2, MessageCircle, Phone, ChevronRight, Users } from 'lucide-react';
 import { Worker } from '../types';
 import { WorkerAvatar } from './WorkerAvatar';
 
-export interface WorkerMarketplaceCardProps {
+export interface WorkerCatalogCardProps {
   worker: Worker;
-  onOpen: (worker: Worker) => void;
+  onOpenProfile: (worker: Worker) => void;
+  onWhatsApp: (worker: Worker, e: React.MouseEvent) => void;
+  onCall: (worker: Worker, e: React.MouseEvent) => void;
 }
 
 /**
- * Big, marketplace-style worker card for the homepage listing (superprof.mx-inspired):
- * the photo dominates the card (~2/3 of its height) and a compact info block with a
- * large "ver fotos de trabajos" CTA sits below it (~1/3).
+ * Full catalog card (search / directory grid): same visual language as the homepage
+ * WorkerMarketplaceCard (photo-dominant, name overlay), extended with a description
+ * snippet and a contact count so visitors can compare workers at a glance.
  */
-export const WorkerMarketplaceCard: React.FC<WorkerMarketplaceCardProps> = ({ worker, onOpen }) => {
+export const WorkerCatalogCard: React.FC<WorkerCatalogCardProps> = ({ worker, onOpenProfile, onWhatsApp, onCall }) => {
   const isVerified = worker.verificationStatus === 'verified' || worker.verificado === true;
 
   const workPhotoList = (worker.workPhotos && worker.workPhotos.length > 0)
@@ -26,15 +28,17 @@ export const WorkerMarketplaceCard: React.FC<WorkerMarketplaceCardProps> = ({ wo
   const fullName = worker.nombre || `${worker.firstName || ''} ${worker.lastName || ''}`.trim() || 'Maestro';
   const oficio = worker.mainTrade || worker.oficio || 'Especialista';
   const zone = (worker.serviceAreas && worker.serviceAreas[0]) || '';
-  const topServices = (worker.services && worker.services.length > 0) ? worker.services.slice(0, 2) : [];
+  const description = worker.description || worker.bio || '';
+  const topServices = (worker.services && worker.services.length > 0) ? worker.services.slice(0, 3) : [];
+  const contactCount = worker.contactCount || 0;
 
   return (
     <div
-      id={`marketplace-card-${worker.slug}`}
-      onClick={() => onOpen(worker)}
+      id={`catalog-card-${worker.slug}`}
+      onClick={() => onOpenProfile(worker)}
       className="group bg-white rounded-3xl border border-slate-200 hover:border-orange-300 hover:shadow-xl shadow-slate-200/40 transition-all duration-200 cursor-pointer overflow-hidden flex flex-col"
     >
-      {/* Photo block: ~2/3 of the card */}
+      {/* Photo block */}
       <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
         {heroPhotoUrl ? (
           <img
@@ -54,8 +58,7 @@ export const WorkerMarketplaceCard: React.FC<WorkerMarketplaceCardProps> = ({ wo
           />
         )}
 
-        {/* Verification badge overlay */}
-        <div className="absolute top-3 left-3">
+        <div className="absolute top-3 left-3 flex items-center gap-1.5">
           {isVerified ? (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/95 text-green-700 text-[11px] font-bold shadow-sm">
               <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
@@ -68,7 +71,15 @@ export const WorkerMarketplaceCard: React.FC<WorkerMarketplaceCardProps> = ({ wo
           )}
         </div>
 
-        {/* Name overlay on the photo, superprof-style */}
+        {contactCount > 0 && (
+          <div className="absolute top-3 right-3">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/90 text-slate-700 text-[11px] font-bold shadow-sm">
+              <Users className="w-3.5 h-3.5 text-slate-500" />
+              {contactCount}
+            </span>
+          </div>
+        )}
+
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent p-4 pt-10">
           <h3 className="text-white font-black text-lg leading-tight drop-shadow-sm">{fullName}</h3>
           {zone && (
@@ -80,8 +91,8 @@ export const WorkerMarketplaceCard: React.FC<WorkerMarketplaceCardProps> = ({ wo
         </div>
       </div>
 
-      {/* Info block: ~1/3 of the card */}
-      <div className="p-4 sm:p-5 space-y-2 flex-1 flex flex-col">
+      {/* Info block */}
+      <div className="p-4 sm:p-5 space-y-2.5 flex-1 flex flex-col">
         <p className="text-orange-600 font-bold text-sm">
           {oficio}
           {typeof worker.yearsExperience === 'number' && worker.yearsExperience > 0 && (
@@ -92,28 +103,47 @@ export const WorkerMarketplaceCard: React.FC<WorkerMarketplaceCardProps> = ({ wo
         {topServices.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {topServices.map((service, idx) => (
-              <span
-                key={idx}
-                className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold"
-              >
+              <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold">
                 {service}
               </span>
             ))}
           </div>
         )}
 
+        {description && (
+          <p className="text-slate-600 text-xs sm:text-sm line-clamp-2 leading-relaxed">
+            {description}
+          </p>
+        )}
+
         <div className="flex-1" />
+
+        <div className="pt-1 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={(e) => onWhatsApp(worker, e)}
+            className="flex-1 py-2.5 px-3 bg-green-600 hover:bg-green-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>WhatsApp</span>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => onCall(worker, e)}
+            className="py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center justify-center cursor-pointer"
+            title="Llamar"
+          >
+            <Phone className="w-4 h-4" />
+          </button>
+        </div>
 
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpen(worker);
-          }}
-          className="w-full mt-1 py-3.5 px-4 bg-slate-900 group-hover:bg-orange-600 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          onClick={() => onOpenProfile(worker)}
+          className="text-slate-700 hover:text-orange-600 font-bold text-xs sm:text-sm flex items-center justify-center gap-1 cursor-pointer pt-1"
         >
-          <Images className="w-4.5 h-4.5" />
-          <span>Ver perfil con fotos</span>
+          <span>Ver perfil completo</span>
+          <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>

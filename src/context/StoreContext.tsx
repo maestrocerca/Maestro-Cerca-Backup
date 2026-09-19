@@ -32,7 +32,8 @@ import {
   limit,
   arrayUnion,
   arrayRemove,
-  writeBatch
+  writeBatch,
+  increment
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { 
@@ -891,6 +892,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Could not record solicitud_contacto in Firestore:', e);
       }
 
+      try {
+        await updateDoc(doc(db, 'maestros', maestro.id), { contactCount: increment(1) });
+      } catch (e) {
+        console.warn('Could not bump contactCount:', e);
+      }
+
       // Update local analytics counters
       setAnalytics((prev) => ({
         ...prev,
@@ -938,6 +945,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           tipo: 'phone' as const,
           telefono: waMeFormat,
         });
+      } catch (e) {
+        // Handled silently
+      }
+
+      try {
+        await updateDoc(doc(db, 'maestros', worker.id), { contactCount: increment(1) });
       } catch (e) {
         // Handled silently
       }

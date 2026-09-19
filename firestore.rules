@@ -96,6 +96,13 @@ service cloud.firestore {
         )
       ) || isAdmin();
 
+      // Public counter increment: anyone (including anonymous visitors) may bump contactCount
+      // by exactly +1 when they tap WhatsApp/phone on a profile. No other field may change in
+      // the same write, so this can never be used to alter any other part of the profile.
+      allow update: if
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contactCount']) &&
+        request.resource.data.contactCount == (resource.data.contactCount is int ? resource.data.contactCount : 0) + 1;
+
       // Delete: Owner or Admin allowed for account self-deletion & privacy rights
       allow delete: if isMaestroOwner(maestroId) || isAdmin();
 

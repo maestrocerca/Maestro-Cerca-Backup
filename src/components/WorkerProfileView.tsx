@@ -19,7 +19,8 @@ import {
   Sparkles,
   User,
   Wrench,
-  Flag
+  Flag,
+  Users
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { WorkPhoto, isPubliclyVisible } from '../types';
@@ -272,6 +273,12 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
                   <Calendar className="w-3.5 h-3.5" />
                   En Maestro Cerca desde {new Date(worker.joinedDate).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' })}
                 </span>
+                {typeof worker.contactCount === 'number' && worker.contactCount > 0 && (
+                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" />
+                    {worker.contactCount} {worker.contactCount === 1 ? 'contacto' : 'contactos'} a través de Maestro Cerca
+                  </span>
+                )}
               </div>
 
               <h1 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
@@ -361,36 +368,7 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
           {/* LEFT MAIN CONTENT (8 cols) */}
           <div className="lg:col-span-8 space-y-8">
             
-            {/* 1. PRIORITY SECTION: TRABAJOS QUE REALIZA */}
-            <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                  <Wrench className="w-5 h-5 text-orange-600" />
-                  <span>Trabajos que realiza</span>
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                  Servicios y tipos de trabajos específicos que puedes solicitarle
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                {worker.services && worker.services.length > 0 ? (
-                  worker.services.map((service, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3.5 rounded-xl bg-orange-50/50 border border-orange-200/70 flex items-start gap-2.5 text-sm text-slate-900 font-medium"
-                    >
-                      <Check className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-                      <span>{service}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-500">Mantenimiento y trabajos especializados de {worker.mainTrade}.</p>
-                )}
-              </div>
-            </section>
-
-            {/* 2. TRABAJOS REALIZADOS (PHOTO GALLERY) */}
+            {/* 1. TOP PRIORITY SECTION: TRABAJOS REALIZADOS (PHOTO GALLERY) */}
             <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -446,6 +424,35 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
                   <p className="text-xs text-slate-500">El trabajador no ha subido fotografías de sus proyectos.</p>
                 </div>
               )}
+            </section>
+
+            {/* 2. TRABAJOS QUE REALIZA */}
+            <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-orange-600" />
+                  <span>Trabajos que realiza</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                  Servicios y tipos de trabajos específicos que puedes solicitarle
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                {worker.services && worker.services.length > 0 ? (
+                  worker.services.map((service, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-xl bg-orange-50/50 border border-orange-200/70 flex items-start gap-2.5 text-sm text-slate-900 font-medium"
+                    >
+                      <Check className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+                      <span>{service}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500">Mantenimiento y trabajos especializados de {worker.mainTrade}.</p>
+                )}
+              </div>
             </section>
 
             {/* 3. ACERCA DE */}

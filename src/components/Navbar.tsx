@@ -48,19 +48,6 @@ export const Navbar: React.FC = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-1 lg:gap-2">
-            <button
-              id="nav-search-btn"
-              onClick={() => navigateTo({ type: 'search' })}
-              className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                isActive('search') 
-                  ? 'text-orange-600 bg-orange-50 font-semibold' 
-                  : 'text-slate-600 hover:text-orange-600 hover:bg-slate-50'
-              }`}
-            >
-              <Search className="w-4 h-4 text-slate-400" />
-              <span>Buscar trabajadores</span>
-            </button>
-
             {/* Navigation CTAs based on session role */}
             {isAdmin ? (
               <div className="flex items-center gap-2 ml-2">

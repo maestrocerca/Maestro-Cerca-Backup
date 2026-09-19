@@ -157,6 +157,8 @@ export interface Maestro {
   telefonoPublico?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** Public vanity counter: how many times visitors tapped WhatsApp/phone on this profile. */
+  contactCount?: number;
 }
 
 // Worker type is synonymous with Maestro for seamless UI compatibility
