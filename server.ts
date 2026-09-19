@@ -575,6 +575,12 @@ async function startServer() {
       const zonas = zonasRaw ? zonasRaw.split(/[,;\n/]+/).map((z) => z.trim()).filter(Boolean) : [];
       const servicios = serviciosRaw ? serviciosRaw.split(/[,;\n/]+/).map((s) => s.trim()).filter(Boolean) : [];
 
+      // The profile view reads firstName/lastName (not just the combined
+      // "nombre" string), so split it here the same way the CSV import path does.
+      const nombreParts = nombre.split(/\s+/).filter(Boolean);
+      const firstName = nombreParts[0] || "";
+      const lastName = nombreParts.slice(1).join(" ");
+
       if (!nombre || !oficioPrincipal || zonas.length === 0) {
         res.status(400).json({
           success: false,
@@ -659,6 +665,8 @@ async function startServer() {
         userId: uid,
         slug,
         nombre,
+        firstName,
+        lastName,
         oficio: oficioPrincipal,
         mainTrade: oficioPrincipal,
         oficioPrincipal,
