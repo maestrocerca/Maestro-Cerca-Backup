@@ -106,7 +106,7 @@ export const WorkerRegisterView: React.FC = () => {
   // Step 3: Professional Info
   const [mainTrade, setMainTrade] = useState('Albañil');
   const [secondaryTrades, setSecondaryTrades] = useState<string[]>([]);
-  const [yearsExperience, setYearsExperience] = useState<number>(5);
+  const [yearsExperience, setYearsExperience] = useState<number>(1);
   const [description, setDescription] = useState('');
   const [services, setServices] = useState<string[]>([]);
   const [customServiceInput, setCustomServiceInput] = useState('');

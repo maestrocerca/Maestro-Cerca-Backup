@@ -102,7 +102,7 @@ export function buildWhatsAppUrl(
   const { waMeFormat } = sanitizeMexicanPhone(rawPhone);
   if (!waMeFormat) return '#';
 
-  const defaultMsg = `¡Hola ${maestroNombre}! Vi tu perfil en Maestro Cerca (Zibatá). Me gustaría consultar tu disponibilidad para un trabajo de ${oficio}.${customNote ? `\n\nDetalle: ${customNote}` : ''}`;
+  const defaultMsg = `¡Hola ${maestroNombre}! Vi tu perfil en Maestro Cerca. Me gustaría consultar tu disponibilidad para un trabajo de ${oficio}.${customNote ? `\n\nDetalle: ${customNote}` : ''}`;
   const encodedMsg = encodeURIComponent(defaultMsg.trim());
 
   return `https://wa.me/${waMeFormat}?text=${encodedMsg}`;

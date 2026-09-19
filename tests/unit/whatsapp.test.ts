@@ -63,6 +63,6 @@ describe('WhatsApp Phone Sanitization & Deep Link Utility', () => {
     expect(url).toContain(encodeURIComponent('Don Roberto'));
     expect(url).toContain(encodeURIComponent('Plomería'));
     expect(url).toContain(encodeURIComponent('Reparación de fuga de agua urgente'));
-    expect(url).toContain('Zibat%C3%A1');
+    expect(url).not.toContain('Zibat%C3%A1');
   });
 });
