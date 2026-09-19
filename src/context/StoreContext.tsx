@@ -35,7 +35,8 @@ import {
   writeBatch,
   increment
 } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { ref, deleteObject } from 'firebase/storage';
+import { auth, db, storage } from '../lib/firebase';
 import { 
   Maestro,
   Worker, 
@@ -2496,10 +2497,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   // Remove photo from Firestore profile (by photo id)
+  // Best-effort deletion of the underlying Storage object for a work photo download URL.
+  // Never blocks the Firestore update on failure (file may already be gone, or the URL
+  // may point to an external/legacy source that isn't in our own bucket).
+  const deleteWorkPhotoStorageObject = async (photoUrl: string) => {
+    if (!photoUrl) return;
+    try {
+      await deleteObject(ref(storage, photoUrl));
+    } catch (err) {
+      console.warn('Work photo Storage cleanup note:', err);
+    }
+  };
+
   const removeWorkerPhoto = useCallback(async (workerId: string, photoId: string) => {
     const target = maestros.find((w) => w.id === workerId);
     if (!target) return;
 
+    const removedPhoto = (target.workPhotos || []).find((p) => p.id === photoId);
     const filtered = (target.workPhotos || []).filter((p) => p.id !== photoId);
 
     try {
@@ -2510,6 +2524,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
     } catch (err) {
       console.warn('Photo remove error:', err);
+    }
+
+    if (removedPhoto?.url) {
+      await deleteWorkPhotoStorageObject(removedPhoto.url);
     }
 
     setMaestros((prev) =>
@@ -2547,6 +2565,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Fallback update error:', fallbackErr);
       }
     }
+
+    await deleteWorkPhotoStorageObject(photoUrl);
 
     setMaestros((prev) =>
       prev.map((w) => {
