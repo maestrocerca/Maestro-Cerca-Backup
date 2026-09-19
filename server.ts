@@ -635,7 +635,7 @@ async function startServer() {
                 const bucket = adminStorage.bucket();
                 const publicPath = `profile-photos-public/${uid}/avatar_manychat_${Date.now()}.jpg`;
                 await bucket.file(publicPath).save(buffer, { metadata: { contentType } });
-                profilePhotoUrl = `https://storage.googleapis.com/${bucket.name}/${publicPath}`;
+                profilePhotoUrl = `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(publicPath)}?alt=media`;
                 profilePhotoReviewStatus = "approved";
               } else {
                 console.warn(`[ManyChat Finalize] Photo rejected by moderation for ${uid}: ${moderation.reason}`);
