@@ -614,11 +614,13 @@ async function startServer() {
       const slug = existingData.slug || (await generateUniqueSlugServer(nombre));
       const parsedYears = parseInt(experienciaRaw, 10);
 
-      // 2. Optional profile photo: same automated moderation gate as the
+      // 2. Optional work-sample photo: same automated moderation gate as the
       //    website's self-publish flow. Never publish an unmoderated image
       //    just because this path skips human admin approval.
-      let profilePhotoUrl = "";
-      let profilePhotoReviewStatus: "none" | "approved" = "none";
+      //    This is a "Trabajos realizados" portfolio photo, NOT the profile
+      //    avatar — the avatar always stays the generic default icon unless
+      //    the worker explicitly uploads a profile photo elsewhere.
+      let workPhotoUrl = "";
       if (fotoUrl) {
         try {
           const controller = new AbortController();
@@ -633,10 +635,9 @@ async function startServer() {
               const moderation = await moderateImageContent(buffer, contentType);
               if (moderation.safe) {
                 const bucket = adminStorage.bucket();
-                const publicPath = `profile-photos-public/${uid}/avatar_manychat_${Date.now()}.jpg`;
+                const publicPath = `portafolios/${uid}/trabajo_manychat_${Date.now()}.jpg`;
                 await bucket.file(publicPath).save(buffer, { metadata: { contentType } });
-                profilePhotoUrl = `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(publicPath)}?alt=media`;
-                profilePhotoReviewStatus = "approved";
+                workPhotoUrl = `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(publicPath)}?alt=media`;
               } else {
                 console.warn(`[ManyChat Finalize] Photo rejected by moderation for ${uid}: ${moderation.reason}`);
               }
@@ -697,11 +698,13 @@ async function startServer() {
         updatedAt: nowIso,
       };
 
-      if (profilePhotoUrl) {
-        maestroDoc.profilePhoto = profilePhotoUrl;
-        maestroDoc.fotoUrl = profilePhotoUrl;
-        maestroDoc.photoUrl = profilePhotoUrl;
-        maestroDoc.profilePhotoReviewStatus = profilePhotoReviewStatus;
+      if (workPhotoUrl) {
+        const existingWorkPhotos = Array.isArray(existingData.workPhotos) ? existingData.workPhotos : [];
+        maestroDoc.workPhotos = [
+          ...existingWorkPhotos,
+          { id: `wp_manychat_${Date.now()}`, url: workPhotoUrl, title: "Trabajo realizado" },
+        ];
+        maestroDoc.fotosTrabajos = maestroDoc.workPhotos.map((p: { url: string }) => p.url);
       }
 
       if (!existingSnap.exists) {
