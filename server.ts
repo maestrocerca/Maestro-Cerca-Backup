@@ -8,6 +8,7 @@ import { initializeApp as initAdminApp, getApps as getAdminApps } from "firebase
 import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import { getStorage as getAdminStorage } from "firebase-admin/storage";
+import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 
 // Load Firebase configuration
@@ -42,6 +43,64 @@ const adminApp = getAdminApps().length === 0 ? initAdminApp({
 const adminAuth = getAdminAuth(adminApp);
 const adminDb = getAdminFirestore(adminApp, firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)" ? firebaseConfig.firestoreDatabaseId : undefined);
 const adminStorage = getAdminStorage(adminApp);
+
+// Gemini client for automated profile photo moderation (see moderateImageContent below).
+// Reads GEMINI_API_KEY from the environment; if it's missing, moderation is skipped
+// (fail-open with a warning) rather than blocking every photo upload.
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+if (!genAI) {
+  console.warn(
+    "[Gemini Moderation Warning]: GEMINI_API_KEY no configurada. La moderación automática de fotos de perfil " +
+    "se omitirá (fail-open) hasta que se configure la variable de entorno."
+  );
+}
+
+/**
+ * Uses Gemini's vision capability to screen a profile photo before it goes public.
+ * Fails open (treats the image as safe) on any API/parsing error so a flaky external
+ * call never permanently blocks a legitimate worker from publishing their photo —
+ * the goal is a moderation net, not a hard gate the whole feature depends on.
+ */
+async function moderateImageContent(
+  buffer: Buffer,
+  mimeType: string
+): Promise<{ safe: boolean; reason?: string }> {
+  if (!genAI) {
+    return { safe: true };
+  }
+
+  try {
+    const response = await genAI.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: [
+        {
+          inlineData: {
+            mimeType,
+            data: buffer.toString("base64"),
+          },
+        },
+        {
+          text:
+            "Esta imagen se publicará como foto de perfil pública de un trabajador de la construcción " +
+            "(albañil, electricista, plomero, etc.) en un directorio de servicios en México. " +
+            "Responde ÚNICAMENTE con 'SAFE' si es una foto de perfil apropiada (persona, rostro, o " +
+            "trabajo/herramientas, sin contenido sexual, desnudez, violencia gráfica, sangre, armas, " +
+            "símbolos de odio, o cualquier otro contenido ofensivo o inapropiado). " +
+            "Si NO es apropiada, responde ÚNICAMENTE con 'UNSAFE: ' seguido de una razón breve en español.",
+        },
+      ],
+    });
+
+    const text = (response.text || "").trim();
+    if (/^unsafe/i.test(text)) {
+      return { safe: false, reason: text.replace(/^unsafe:?\s*/i, "") || "Contenido inapropiado detectado." };
+    }
+    return { safe: true };
+  } catch (err: any) {
+    console.warn("[Gemini Moderation Warning]: Falló la clasificación, se permite la publicación (fail-open):", err?.message);
+    return { safe: true };
+  }
+}
 
 /**
  * Normalizes Mexican phone number to E.164 (+52XXXXXXXXXX)
@@ -1786,6 +1845,38 @@ async function startServer() {
       const [fileExists] = await sourceFile.exists();
       if (!fileExists) {
         return res.status(400).json({ error: "La fotografía pendiente no se encontró en Storage." });
+      }
+
+      // Automated moderation gate (Gemini vision): screens the photo before it can ever
+      // go public. See moderateImageContent for the fail-open policy on API errors.
+      try {
+        const [metadata] = await sourceFile.getMetadata();
+        const [imageBuffer] = await sourceFile.download();
+        const moderation = await moderateImageContent(imageBuffer, metadata.contentType || "image/jpeg");
+        if (!moderation.safe) {
+          await sourceFile.delete().catch(() => {});
+          await adminDb.collection("maestros").doc(workerId).collection("privado").doc("media").set(
+            {
+              pendingProfilePhotoPath: null,
+              profilePhotoReviewStatus: "rejected",
+              rejectNotes: `Rechazo automático (Gemini): ${moderation.reason || "Contenido inapropiado."}`,
+              reviewedAt: new Date().toISOString(),
+              reviewedBy: "gemini_auto_moderation",
+            },
+            { merge: true }
+          );
+          await workerRef.update({
+            pendingProfilePhotoPath: null,
+            profilePhotoReviewStatus: "rejected",
+            updatedAt: new Date().toISOString(),
+          });
+          return res.status(422).json({
+            error: "Tu fotografía no cumple con nuestras políticas de contenido. Por favor sube otra foto.",
+            reason: moderation.reason,
+          });
+        }
+      } catch (modErr: any) {
+        console.warn("[Photo Self-Publish] Moderation step skipped due to error (fail-open):", modErr?.message);
       }
 
       const fileName = path.basename(pendingStoragePath);
