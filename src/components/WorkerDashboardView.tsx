@@ -855,6 +855,47 @@ export const WorkerDashboardView: React.FC = () => {
           </div>
         )}
 
+        {/* Persistent Warning Banner for WhatsApp-registered workers without an approved profile photo */}
+        {currentWorker.registrationMethod === 'manychat_whatsapp' && !reqPhotoApproved && (
+          <div
+            id="dashboard-photo-required-alert"
+            className="p-5 sm:p-6 bg-orange-50 border-2 border-orange-300 rounded-3xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-300"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Camera className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-base font-black text-orange-950">Falta tu foto de perfil</h4>
+                  <span className="text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-orange-200 text-orange-900 border border-orange-300">
+                    Aún apareces como "Registrado"
+                  </span>
+                </div>
+                <p className="text-sm text-orange-900 leading-relaxed font-medium">
+                  Sube o toma tu foto de perfil ahora para que los clientes puedan verificar que eres tú. Sin ella, tu perfil se queda en "Registrado" en lugar de avanzar a "Verificado".
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              id="dashboard-upload-photo-btn"
+              onClick={() => {
+                setActiveTab('profile');
+                setTimeout(() => {
+                  document.getElementById('section-profile-header')?.scrollIntoView({
+                    behavior: 'smooth',
+                  });
+                }, 100);
+              }}
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
+            >
+              <Camera className="w-4 h-4" />
+              <span>SUBIR FOTO</span>
+            </button>
+          </div>
+        )}
+
         {/* Header Profile Card */}
         <div id="section-profile-header" className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-5">

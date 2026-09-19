@@ -154,6 +154,37 @@ function normalizeMexicanPhone(rawPhone: string): { e164: string; digitsOnly: st
   return { e164: "", digitsOnly: digits, isValid: false };
 }
 
+// Canonical availability options shown across the site. WhatsApp/ManyChat
+// answers are free text, so we map common phrasings onto one of these fixed
+// labels instead of storing whatever wording the AI Step happened to produce.
+const DISPONIBILIDAD_OPTIONS = [
+  "Lunes a viernes",
+  "Fines de semana",
+  "Todos los días",
+  "Medio tiempo",
+  "Bajo cita",
+] as const;
+
+function normalizeDisponibilidad(raw: string): string {
+  const text = raw.trim().toLowerCase();
+  if (!text) return "";
+
+  const hasWeekdays = /(lunes|martes|mi[eé]rcoles|jueves|viernes|semana)/.test(text);
+  const hasWeekend = /(fin de semana|fines de semana|s[aá]bado|domingo)/.test(text);
+  const isFullTime = /(todos los d[ií]as|tiempo completo|cualquier d[ií]a|24\/7|siempre)/.test(text);
+  const isPartTime = /(medio tiempo|medio d[ií]a|algunas horas|parcial)/.test(text);
+  const isByAppointment = /(cita|agendar|previa cita|por proyecto)/.test(text);
+
+  if (isFullTime || (hasWeekdays && hasWeekend)) return "Todos los días";
+  if (hasWeekend && !hasWeekdays) return "Fines de semana";
+  if (hasWeekdays) return "Lunes a viernes";
+  if (isPartTime) return "Medio tiempo";
+  if (isByAppointment) return "Bajo cita";
+
+  // No confident match — keep the raw answer rather than silently discarding it.
+  return raw.trim();
+}
+
 /**
  * Generates a unique, URL-safe slug for a worker's public profile from their full name,
  * appending an incrementing suffix on collision. Shared by /api/auth/generate-slug and
@@ -568,7 +599,7 @@ async function startServer() {
       const zonasRaw = typeof body.zonas_cobertura === "string" ? body.zonas_cobertura.trim() : "";
       const serviciosRaw = typeof body.servicios_adicionales === "string" ? body.servicios_adicionales.trim() : "";
       const experienciaRaw = typeof body.experiencia === "string" ? body.experiencia.trim() : "";
-      const disponibilidad = typeof body.disponibilidad === "string" ? body.disponibilidad.trim() : "";
+      const disponibilidad = typeof body.disponibilidad === "string" ? normalizeDisponibilidad(body.disponibilidad) : "";
       const manychatUserId = typeof body.manychat_user_id === "string" ? body.manychat_user_id.trim() : "";
       const fotoUrl = typeof body.foto_url === "string" ? body.foto_url.trim() : "";
 

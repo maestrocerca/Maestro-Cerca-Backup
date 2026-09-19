@@ -299,6 +299,13 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
                   <MapPin className="w-4 h-4 text-orange-600 shrink-0" />
                   <span>{mainArea ? `Zona principal: ${mainArea}` : 'Zona principal no especificada'}</span>
                 </div>
+
+                {worker.disponibilidad && (
+                  <div className="flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-lg">
+                    <Clock className="w-4 h-4 text-slate-600" />
+                    <span>Disponibilidad: {worker.disponibilidad}</span>
+                  </div>
+                )}
               </div>
 
               {/* Secondary trades */}
