@@ -601,7 +601,9 @@ async function startServer() {
       const experienciaRaw = typeof body.experiencia === "string" ? body.experiencia.trim() : "";
       const disponibilidad = typeof body.disponibilidad === "string" ? normalizeDisponibilidad(body.disponibilidad) : "";
       const manychatUserId = typeof body.manychat_user_id === "string" ? body.manychat_user_id.trim() : "";
-      const fotoUrl = typeof body.foto_url === "string" ? body.foto_url.trim() : "";
+      const fotoUrls = ["foto_url", "foto_url_2", "foto_url_3", "foto_url_4", "foto_url_5"]
+        .map((key) => (typeof body[key] === "string" ? body[key].trim() : ""))
+        .filter(Boolean);
 
       const zonas = zonasRaw ? zonasRaw.split(/[,;\n/]+/).map((z) => z.trim()).filter(Boolean) : [];
       const servicios = serviciosRaw ? serviciosRaw.split(/[,;\n/]+/).map((s) => s.trim()).filter(Boolean) : [];
@@ -657,8 +659,8 @@ async function startServer() {
       //    This is a "Trabajos realizados" portfolio photo, NOT the profile
       //    avatar — the avatar always stays the generic default icon unless
       //    the worker explicitly uploads a profile photo elsewhere.
-      let workPhotoUrl = "";
-      if (fotoUrl) {
+      const workPhotoUrls: string[] = [];
+      for (const fotoUrl of fotoUrls) {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -672,9 +674,9 @@ async function startServer() {
               const moderation = await moderateImageContent(buffer, contentType);
               if (moderation.safe) {
                 const bucket = adminStorage.bucket();
-                const publicPath = `portafolios/${uid}/trabajo_manychat_${Date.now()}.jpg`;
+                const publicPath = `portafolios/${uid}/trabajo_manychat_${Date.now()}_${workPhotoUrls.length}.jpg`;
                 await bucket.file(publicPath).save(buffer, { metadata: { contentType } });
-                workPhotoUrl = `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(publicPath)}?alt=media`;
+                workPhotoUrls.push(`https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(publicPath)}?alt=media`);
               } else {
                 console.warn(`[ManyChat Finalize] Photo rejected by moderation for ${uid}: ${moderation.reason}`);
               }
@@ -737,11 +739,11 @@ async function startServer() {
         updatedAt: nowIso,
       };
 
-      if (workPhotoUrl) {
+      if (workPhotoUrls.length > 0) {
         const existingWorkPhotos = Array.isArray(existingData.workPhotos) ? existingData.workPhotos : [];
         maestroDoc.workPhotos = [
           ...existingWorkPhotos,
-          { id: `wp_manychat_${Date.now()}`, url: workPhotoUrl, title: "Trabajo realizado" },
+          ...workPhotoUrls.map((url, i) => ({ id: `wp_manychat_${Date.now()}_${i}`, url, title: "Trabajo realizado" })),
         ];
         maestroDoc.fotosTrabajos = maestroDoc.workPhotos.map((p: { url: string }) => p.url);
       }
