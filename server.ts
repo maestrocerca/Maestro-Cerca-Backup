@@ -534,12 +534,29 @@ async function startServer() {
 
       const body = req.body || {};
 
-      // Identity anchor: ONLY the verified WhatsApp ID system field. Any other
-      // phone-shaped field in the payload is ignored for identity purposes.
-      const rawWhatsAppId = typeof body.whatsapp_id === "string" ? body.whatsapp_id.trim() : "";
+      // Identity anchor: ONLY the verified WhatsApp number. ManyChat's flow-builder
+      // UI does not expose "WhatsApp ID" as an insertable token anywhere (confirmed:
+      // absent from the External Request field picker, the Set User Field value
+      // picker, and search by name in both) — it only ever appears inside the raw
+      // subscriber object produced by "Full Contact Data". So this endpoint accepts
+      // EITHER a direct whatsapp_id (in case a future ManyChat feature exposes it
+      // as a token) OR a full_contact object/JSON-string from "+ Añadir Full Contact
+      // Data", and pulls the verified number out of the latter's whatsapp_phone /
+      // whatsapp_id field. A free-text phone answer typed by the user must NEVER be
+      // accepted here, since that can be typed by anyone and would let a visitor
+      // impersonate or fabricate profiles for other numbers.
+      let fullContact: any = body.full_contact;
+      if (typeof fullContact === "string") {
+        try { fullContact = JSON.parse(fullContact); } catch { fullContact = null; }
+      }
+      const rawWhatsAppId =
+        (typeof body.whatsapp_id === "string" && body.whatsapp_id.trim()) ||
+        (fullContact && typeof fullContact.whatsapp_phone === "string" && fullContact.whatsapp_phone) ||
+        (fullContact && typeof fullContact.whatsapp_id === "string" && fullContact.whatsapp_id) ||
+        "";
       const { e164, digitsOnly, isValid } = normalizeMexicanPhone(rawWhatsAppId);
       if (!isValid) {
-        res.status(400).json({ success: false, error: "whatsapp_id inválido o ausente. Debe ser el System Field 'WhatsApp ID' de ManyChat, no una respuesta de texto." });
+        res.status(400).json({ success: false, error: "No se encontró un WhatsApp verificado válido. Envía whatsapp_id o full_contact (Full Contact Data de ManyChat), nunca una respuesta de texto libre." });
         return;
       }
 
