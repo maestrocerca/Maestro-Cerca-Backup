@@ -1,21 +1,20 @@
 import React from 'react';
-import { MapPin, CheckCircle2, MessageCircle, Phone, ChevronRight, Users } from 'lucide-react';
+import { MapPin, CheckCircle2, ChevronRight, Users } from 'lucide-react';
 import { Worker } from '../types';
 import { WorkerAvatar } from './WorkerAvatar';
 
 export interface WorkerCatalogCardProps {
   worker: Worker;
   onOpenProfile: (worker: Worker) => void;
-  onWhatsApp: (worker: Worker, e: React.MouseEvent) => void;
-  onCall: (worker: Worker, e: React.MouseEvent) => void;
 }
 
 /**
  * Full catalog card (search / directory grid): same visual language as the homepage
  * WorkerMarketplaceCard (photo-dominant, name overlay), extended with a description
  * snippet and a contact count so visitors can compare workers at a glance.
+ * Contact actions (WhatsApp/Llamar) live on the full profile page, not here.
  */
-export const WorkerCatalogCard: React.FC<WorkerCatalogCardProps> = ({ worker, onOpenProfile, onWhatsApp, onCall }) => {
+export const WorkerCatalogCard: React.FC<WorkerCatalogCardProps> = ({ worker, onOpenProfile }) => {
   const isVerified = worker.verificationStatus === 'verified' || worker.verificado === true;
 
   const workPhotoList = (worker.workPhotos && worker.workPhotos.length > 0)
@@ -118,32 +117,16 @@ export const WorkerCatalogCard: React.FC<WorkerCatalogCardProps> = ({ worker, on
 
         <div className="flex-1" />
 
-        <div className="pt-1 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={(e) => onWhatsApp(worker, e)}
-            className="flex-1 py-2.5 px-3 bg-green-600 hover:bg-green-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span>WhatsApp</span>
-          </button>
-          <button
-            type="button"
-            onClick={(e) => onCall(worker, e)}
-            className="py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center justify-center cursor-pointer"
-            title="Llamar"
-          >
-            <Phone className="w-4 h-4" />
-          </button>
-        </div>
-
         <button
           type="button"
-          onClick={() => onOpenProfile(worker)}
-          className="text-slate-700 hover:text-orange-600 font-bold text-xs sm:text-sm flex items-center justify-center gap-1 cursor-pointer pt-1"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenProfile(worker);
+          }}
+          className="w-full mt-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
         >
           <span>Ver perfil completo</span>
-          <ChevronRight className="w-3.5 h-3.5" />
+          <ChevronRight className="w-4 h-4" />
         </button>
       </div>
     </div>

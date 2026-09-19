@@ -17,7 +17,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
   initialArea = '',
   initialVerifiedOnly = false,
 }) => {
-  const { workers, trades, serviceAreas, navigateTo, logContactClick, contactarWhatsApp, trackSearch } = useStore();
+  const { workers, trades, serviceAreas, navigateTo, trackSearch } = useStore();
 
   const [tradeFilter, setTradeFilter] = useState<string>(initialTrade);
   const [areaFilter, setAreaFilter] = useState<string>(initialArea);
@@ -129,17 +129,6 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
     setAreaFilter('');
     setVerifiedOnly(false);
     setMinExperience(0);
-  };
-
-  const handleWhatsAppContact = (worker: Worker, e: React.MouseEvent) => {
-    e.stopPropagation();
-    contactarWhatsApp(worker);
-  };
-
-  const handlePhoneCall = (worker: Worker, e: React.MouseEvent) => {
-    e.stopPropagation();
-    logContactClick(worker, 'phone');
-    window.location.href = `tel:${worker.phone}`;
   };
 
   // Pluralization helper for trade titles in Spanish
@@ -400,8 +389,6 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
                   key={worker.id}
                   worker={worker}
                   onOpenProfile={(w) => navigateTo({ type: 'profile', workerSlug: w.slug })}
-                  onWhatsApp={handleWhatsAppContact}
-                  onCall={handlePhoneCall}
                 />
               ))}
             </div>
