@@ -123,7 +123,7 @@ export const WorkerCatalogCard: React.FC<WorkerCatalogCardProps> = ({ worker, on
             e.stopPropagation();
             onOpenProfile(worker);
           }}
-          className="w-full mt-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full mt-1 py-3.5 px-4 bg-slate-900 group-hover:bg-orange-600 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
         >
           <span>Ver perfil completo</span>
           <ChevronRight className="w-4 h-4" />
