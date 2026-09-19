@@ -155,6 +155,37 @@ function normalizeMexicanPhone(rawPhone: string): { e164: string; digitsOnly: st
 }
 
 /**
+ * Generates a unique, URL-safe slug for a worker's public profile from their full name,
+ * appending an incrementing suffix on collision. Shared by /api/auth/generate-slug and
+ * the ManyChat finalize-registration endpoint.
+ */
+async function generateUniqueSlugServer(fullName: string): Promise<string> {
+  const base =
+    (fullName || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "maestro";
+
+  let candidate = base;
+  let counter = 1;
+
+  try {
+    while (true) {
+      const snap = await adminDb.collection("maestros").where("slug", "==", candidate).limit(1).get();
+      if (snap.empty) return candidate;
+      counter++;
+      candidate = `${base}-${counter}`;
+    }
+  } catch (err: any) {
+    console.warn("[Generate Slug Warning]: Firestore query failed, using fallback slug:", err?.message);
+    const fallbackSuffix = Math.random().toString(36).substring(2, 6);
+    return `${base}-${fallbackSuffix}`;
+  }
+}
+
+/**
  * Copies an external image from URL (e.g. ManyChat / WhatsApp CDN) to Firebase Storage.
  * If copy fails or bucket is not provisioned, falls back gracefully to the original URL so data is never lost.
  */
@@ -464,6 +495,229 @@ async function startServer() {
 
   app.post("/api/webhooks/manychat", handleManyChatWebhook);
   app.post("/api/manychat/register", handleManyChatWebhook);
+
+  // =========================================================================
+  // MANYCHAT FINALIZE REGISTRATION ENDPOINT (WhatsApp-only onboarding, no browser)
+  // POST /api/manychat/finalize-registration
+  //
+  // This is the ONLY endpoint that turns a WhatsApp conversation into a real,
+  // published /maestros profile. Identity is anchored EXCLUSIVELY to the
+  // ManyChat "WhatsApp ID" System Field (whatsapp_id) — the number Meta's
+  // WhatsApp Business Platform cryptographically attests the message came
+  // from. It must NEVER be filled from a free-text bot answer (e.g. a custom
+  // field capturing "¿cuál es tu número?"), since that can be typed by anyone
+  // and would let a visitor impersonate or fabricate profiles for other
+  // numbers. The public contact number is always forced to equal this same
+  // WhatsApp ID — there is no way to register a different public number
+  // through this flow (that would require a separate, real OTP proof).
+  //
+  // Anti-duplication guarantee: Firebase Auth enforces that a phone number
+  // can belong to at most one user account project-wide. By resolving/creating
+  // the Auth user here (adminAuth.getUserByPhoneNumber / createUser) instead of
+  // leaving account creation to a client-side flow, repeated registration
+  // attempts for the same WhatsApp ID always resolve to the same UID — it is
+  // structurally impossible to end up with 10 profiles for one phone number.
+  // =========================================================================
+  app.post("/api/manychat/finalize-registration", async (req: Request, res: Response): Promise<void> => {
+    try {
+      const expectedSecret = process.env.MANYCHAT_WEBHOOK_SECRET;
+      if (!expectedSecret || expectedSecret.trim() === "") {
+        res.status(503).json({ success: false, error: "Servicio no configurado" });
+        return;
+      }
+      const rawHeaderKey = req.get("x-api-key") || (req.headers["x-api-key"] as string | undefined);
+      const apiKey = Array.isArray(rawHeaderKey) ? rawHeaderKey[0] : rawHeaderKey;
+      if (!apiKey || apiKey !== expectedSecret) {
+        res.status(401).json({ success: false, error: "Unauthorized" });
+        return;
+      }
+
+      const body = req.body || {};
+
+      // Identity anchor: ONLY the verified WhatsApp ID system field. Any other
+      // phone-shaped field in the payload is ignored for identity purposes.
+      const rawWhatsAppId = typeof body.whatsapp_id === "string" ? body.whatsapp_id.trim() : "";
+      const { e164, digitsOnly, isValid } = normalizeMexicanPhone(rawWhatsAppId);
+      if (!isValid) {
+        res.status(400).json({ success: false, error: "whatsapp_id inválido o ausente. Debe ser el System Field 'WhatsApp ID' de ManyChat, no una respuesta de texto." });
+        return;
+      }
+
+      // Required fields to actually publish a profile — until the bot has
+      // collected all of these, ManyChat should keep talking, not finalize.
+      const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
+      const oficioPrincipal = typeof body.oficio_principal === "string" ? body.oficio_principal.trim() : "";
+      const ciudad = typeof body.ciudad_principal === "string" ? body.ciudad_principal.trim() : "";
+      const zonasRaw = typeof body.zonas_cobertura === "string" ? body.zonas_cobertura.trim() : "";
+      const serviciosRaw = typeof body.servicios_adicionales === "string" ? body.servicios_adicionales.trim() : "";
+      const experienciaRaw = typeof body.experiencia === "string" ? body.experiencia.trim() : "";
+      const disponibilidad = typeof body.disponibilidad === "string" ? body.disponibilidad.trim() : "";
+      const manychatUserId = typeof body.manychat_user_id === "string" ? body.manychat_user_id.trim() : "";
+      const fotoUrl = typeof body.foto_url === "string" ? body.foto_url.trim() : "";
+
+      const zonas = zonasRaw ? zonasRaw.split(/[,;\n/]+/).map((z) => z.trim()).filter(Boolean) : [];
+      const servicios = serviciosRaw ? serviciosRaw.split(/[,;\n/]+/).map((s) => s.trim()).filter(Boolean) : [];
+
+      if (!nombre || !oficioPrincipal || zonas.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: "Faltan datos obligatorios (nombre, oficio_principal, zonas_cobertura). El bot debe seguir preguntando antes de finalizar.",
+        });
+        return;
+      }
+
+      // 1. Resolve or create the Firebase Auth user for this WhatsApp ID.
+      //    Firebase's own phone-number-uniqueness guarantee is what makes
+      //    "10 accounts, same number" structurally impossible.
+      let uid: string;
+      try {
+        const existingUser = await adminAuth.getUserByPhoneNumber(e164);
+        uid = existingUser.uid;
+      } catch (lookupErr: any) {
+        if (lookupErr?.code === "auth/user-not-found") {
+          const newUser = await adminAuth.createUser({ phoneNumber: e164 });
+          uid = newUser.uid;
+        } else {
+          throw lookupErr;
+        }
+      }
+
+      const workerRef = adminDb.collection("maestros").doc(uid);
+      const existingSnap = await workerRef.get();
+      const existingData = existingSnap.exists ? existingSnap.data() || {} : {};
+
+      // Never downgrade or resurrect an already-approved, complete profile —
+      // treat a repeat finalize call for the same person as a no-op success.
+      if (existingSnap.exists && existingData.aprobado === true && existingData.onboardingIncomplete !== true) {
+        res.status(200).json({ success: true, workerId: uid, slug: existingData.slug, alreadyExisted: true });
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      const slug = existingData.slug || (await generateUniqueSlugServer(nombre));
+      const parsedYears = parseInt(experienciaRaw, 10);
+
+      // 2. Optional profile photo: same automated moderation gate as the
+      //    website's self-publish flow. Never publish an unmoderated image
+      //    just because this path skips human admin approval.
+      let profilePhotoUrl = "";
+      let profilePhotoReviewStatus: "none" | "approved" = "none";
+      if (fotoUrl) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+          const imgRes = await fetch(fotoUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (imgRes.ok) {
+            const arrayBuffer = await imgRes.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+            if (buffer.length <= 10 * 1024 * 1024) {
+              const moderation = await moderateImageContent(buffer, contentType);
+              if (moderation.safe) {
+                const bucket = adminStorage.bucket();
+                const publicPath = `profile-photos-public/${uid}/avatar_manychat_${Date.now()}.jpg`;
+                await bucket.file(publicPath).save(buffer, { metadata: { contentType } });
+                profilePhotoUrl = `https://storage.googleapis.com/${bucket.name}/${publicPath}`;
+                profilePhotoReviewStatus = "approved";
+              } else {
+                console.warn(`[ManyChat Finalize] Photo rejected by moderation for ${uid}: ${moderation.reason}`);
+              }
+            }
+          }
+        } catch (photoErr: any) {
+          console.warn("[ManyChat Finalize] Photo fetch/moderation skipped:", photoErr?.message);
+        }
+      }
+
+      // 3. Publish the profile. phoneVerified=true is attested by the
+      //    WhatsApp Business Platform identity, not Firebase SMS — the
+      //    distinct phoneVerificationMethod records exactly that provenance.
+      //    Per product policy, this profile auto-publishes (aprobado=true)
+      //    without human review; identityVerified/referencesVerified stay
+      //    false since those still require the manual "Verificado" process.
+      const maestroDoc: Record<string, any> = {
+        id: uid,
+        userId: uid,
+        slug,
+        nombre,
+        oficio: oficioPrincipal,
+        mainTrade: oficioPrincipal,
+        oficioPrincipal,
+        bio: servicios.length > 0 ? `${oficioPrincipal} en ${ciudad || "Querétaro"}. ${servicios.join(", ")}.` : `Especialista en ${oficioPrincipal}.`,
+        description: servicios.length > 0 ? `${oficioPrincipal} en ${ciudad || "Querétaro"}. ${servicios.join(", ")}.` : `Especialista en ${oficioPrincipal}.`,
+        ciudad: ciudad || "",
+        serviceAreas: zonas,
+        zonas: zonasRaw,
+        servicios,
+        serviciosAdicionales: serviciosRaw,
+        yearsExperience: (!isNaN(parsedYears) && parsedYears > 0) ? parsedYears : null,
+        experiencia: experienciaRaw,
+        disponibilidad,
+        phone: digitsOnly,
+        phoneE164: e164,
+        telefono: digitsOnly,
+        telefonoWhatsApp: e164,
+        telefonoPublico: e164,
+        whatsapp: e164,
+        manychatUserId: manychatUserId || undefined,
+        source: "manychat",
+        registrationMethod: "manychat_whatsapp",
+        status: "active",
+        onboardingIncomplete: false,
+        aprobado: true,
+        statusPerfil: "Aprobado",
+        verificado: false,
+        nivel: "Aspirante",
+        phoneVerified: true,
+        phoneVerifiedAt: nowIso,
+        phoneVerificationMethod: "whatsapp_business_platform",
+        privacyNoticeAccepted: true,
+        privacyNoticeAcceptedAt: nowIso,
+        termsAccepted: true,
+        termsAcceptedAt: nowIso,
+        isAvailable: true,
+        updatedAt: nowIso,
+      };
+
+      if (profilePhotoUrl) {
+        maestroDoc.profilePhoto = profilePhotoUrl;
+        maestroDoc.fotoUrl = profilePhotoUrl;
+        maestroDoc.photoUrl = profilePhotoUrl;
+        maestroDoc.profilePhotoReviewStatus = profilePhotoReviewStatus;
+      }
+
+      if (!existingSnap.exists) {
+        maestroDoc.createdAt = nowIso;
+        maestroDoc.fechaRegistro = nowIso;
+        maestroDoc.joinedDate = nowIso.split("T")[0];
+      }
+
+      await workerRef.set(maestroDoc, { merge: true });
+
+      // 4. Reconcile the matching preWorker draft (if the incremental webhook
+      //    was also used during the conversation) so it's not left dangling.
+      try {
+        const preWorkerId = `pre_${digitsOnly}`;
+        await adminDb.collection("preWorkers").doc(preWorkerId).set(
+          { status: "claimed", claimedByUid: uid, claimedAt: nowIso, updatedAt: nowIso },
+          { merge: true }
+        );
+      } catch (preErr) {
+        // Non-critical bookkeeping; never fail finalize because of it.
+      }
+
+      res.status(200).json({
+        success: true,
+        workerId: uid,
+        slug,
+        profileUrl: `/trabajador/${encodeURIComponent(slug)}`,
+      });
+    } catch (err: any) {
+      console.error("[ManyChat Finalize] Unhandled error:", err);
+      res.status(500).json({ success: false, error: err?.message || "Error al finalizar el registro." });
+    }
+  });
 
   // =========================================================================
   // SECURE ACCOUNT DELETION ENDPOINT
