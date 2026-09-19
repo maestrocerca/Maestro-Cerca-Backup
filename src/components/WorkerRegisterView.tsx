@@ -29,6 +29,7 @@ import { Worker, WorkPhoto } from '../types';
 import { auth } from '../lib/firebase';
 import { WorkerAvatar } from './WorkerAvatar';
 import { uploadWorkerProfileImage, uploadWorkerWorkPhoto, validateImageFile } from '../lib/storage';
+import { FACEBOOK_AUTH_ENABLED } from '../config/featureFlags';
 
 const FacebookIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5 shrink-0" }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -1139,35 +1140,39 @@ export const WorkerRegisterView: React.FC = () => {
               </form>
             )}
 
-            {/* Divider */}
-            <div className="relative flex py-1 items-center">
-              <div className="grow border-t border-slate-200"></div>
-              <span className="shrink mx-4 text-xs font-bold uppercase text-slate-400">
-                O regístrate con
-              </span>
-              <div className="grow border-t border-slate-200"></div>
-            </div>
+            {/* Social Authentication Options: disabled for the MVP (FACEBOOK_AUTH_ENABLED flag) */}
+            {FACEBOOK_AUTH_ENABLED && (
+              <>
+                {/* Divider */}
+                <div className="relative flex py-1 items-center">
+                  <div className="grow border-t border-slate-200"></div>
+                  <span className="shrink mx-4 text-xs font-bold uppercase text-slate-400">
+                    O regístrate con
+                  </span>
+                  <div className="grow border-t border-slate-200"></div>
+                </div>
 
-            {/* Social Authentication Options */}
-            <div className="space-y-3">
-              {/* Facebook Button */}
-              <button
-                type="button"
-                id="register-facebook-btn"
-                disabled={isFacebookLoading || isPhoneLoading}
-                onClick={handleFacebookSignUp}
-                className="w-full py-3.5 px-4 bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {isFacebookLoading ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <FacebookIcon className="w-5 h-5 text-white" />
-                    <span>Continuar con Facebook</span>
-                  </>
-                )}
-              </button>
-            </div>
+                <div className="space-y-3">
+                  {/* Facebook Button */}
+                  <button
+                    type="button"
+                    id="register-facebook-btn"
+                    disabled={isFacebookLoading || isPhoneLoading}
+                    onClick={handleFacebookSignUp}
+                    className="w-full py-3.5 px-4 bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isFacebookLoading ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <FacebookIcon className="w-5 h-5 text-white" />
+                        <span>Continuar con Facebook</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
 
             {/* Existing User Redirect Note */}
             <div className="pt-3 border-t border-slate-100 text-center space-y-1.5">

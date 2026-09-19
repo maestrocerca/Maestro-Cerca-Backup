@@ -302,6 +302,15 @@ const getInitialView = (): AppView => {
     if (lowerPath === '/admin' || lowerPath === '/admin/') {
       return { type: 'admin' };
     }
+    // Deep links for the ManyChat/WhatsApp handoff: the chatbot sends the worker
+    // straight here to confirm their phone by SMS and finish activating the profile
+    // it already collected (see preWorker auto-claim in confirmPhoneVerificationCode).
+    if (lowerPath === '/registro' || lowerPath === '/registro/') {
+      return { type: 'register' };
+    }
+    if (lowerPath === '/iniciar-sesion' || lowerPath === '/iniciar-sesion/') {
+      return { type: 'login' };
+    }
   }
   return { type: 'home' };
 };
@@ -754,6 +763,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (window.location.pathname.toLowerCase() !== '/admin') {
           window.history.pushState({ view }, '', '/admin');
         }
+      } else if (view.type === 'register') {
+        if (window.location.pathname.toLowerCase() !== '/registro') {
+          window.history.pushState({ view }, '', '/registro');
+        }
+      } else if (view.type === 'login') {
+        if (window.location.pathname.toLowerCase() !== '/iniciar-sesion') {
+          window.history.pushState({ view }, '', '/iniciar-sesion');
+        }
       } else {
         if (window.location.pathname !== '/') {
           window.history.pushState({ view }, '', '/');
@@ -781,6 +798,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCurrentView({ type: 'privacy' });
       } else if (path.toLowerCase() === '/admin' || path.toLowerCase() === '/admin/') {
         setCurrentView({ type: 'admin' });
+      } else if (path.toLowerCase() === '/registro' || path.toLowerCase() === '/registro/') {
+        setCurrentView({ type: 'register' });
+      } else if (path.toLowerCase() === '/iniciar-sesion' || path.toLowerCase() === '/iniciar-sesion/') {
+        setCurrentView({ type: 'login' });
       } else {
         setCurrentView({ type: 'home' });
       }

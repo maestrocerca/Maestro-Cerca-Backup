@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { ConfirmationResult } from 'firebase/auth';
 import { useStore, formatMexicanPhoneToE164, formatPhoneForDisplay } from '../context/StoreContext';
+import { FACEBOOK_AUTH_ENABLED } from '../config/featureFlags';
 import loginHeaderImage from '../assets/images/regenerated_image_1789689228307.png';
 
 const FacebookIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5 shrink-0" }) => (
@@ -343,44 +344,48 @@ export const WorkerLoginView: React.FC = () => {
                 </button>
               </form>
 
-              {/* Dual Auth Divider */}
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200"></div>
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-3 text-slate-400 font-semibold tracking-wider">o bien</span>
-                </div>
-              </div>
+              {/* OAuth Providers: disabled for the MVP (FACEBOOK_AUTH_ENABLED flag) */}
+              {FACEBOOK_AUTH_ENABLED && (
+                <>
+                  {/* Dual Auth Divider */}
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white px-3 text-slate-400 font-semibold tracking-wider">o bien</span>
+                    </div>
+                  </div>
 
-              {/* OAuth Providers */}
-              <div className="space-y-3">
-                {/* Facebook Sign-In Button */}
-                <button
-                  type="button"
-                  id="worker-facebook-login-btn"
-                  onClick={handleFacebookSignIn}
-                  disabled={isLoading || isFacebookLoading}
-                  className="w-full py-3.5 px-4 bg-[#1877F2] hover:bg-[#166FE5] active:bg-[#1465D2] text-white font-bold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isFacebookLoading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Conectando con Facebook...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FacebookIcon className="w-5 h-5 fill-white shrink-0" />
-                      <span>Continuar con Facebook</span>
-                    </>
-                  )}
-                </button>
+                  <div className="space-y-3">
+                    {/* Facebook Sign-In Button */}
+                    <button
+                      type="button"
+                      id="worker-facebook-login-btn"
+                      onClick={handleFacebookSignIn}
+                      disabled={isLoading || isFacebookLoading}
+                      className="w-full py-3.5 px-4 bg-[#1877F2] hover:bg-[#166FE5] active:bg-[#1465D2] text-white font-bold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isFacebookLoading ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Conectando con Facebook...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FacebookIcon className="w-5 h-5 fill-white shrink-0" />
+                          <span>Continuar con Facebook</span>
+                        </>
+                      )}
+                    </button>
 
-                {/* Texto aclaratorio para evitar cuentas duplicadas */}
-                <p className="text-xs text-slate-500 text-center leading-relaxed pt-1">
-                  ¿Ya tienes una cuenta creada con celular? Inicia con tu teléfono. También puedes vincular Facebook desde tu perfil.
-                </p>
-              </div>
+                    {/* Texto aclaratorio para evitar cuentas duplicadas */}
+                    <p className="text-xs text-slate-500 text-center leading-relaxed pt-1">
+                      ¿Ya tienes una cuenta creada con celular? Inicia con tu teléfono. También puedes vincular Facebook desde tu perfil.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

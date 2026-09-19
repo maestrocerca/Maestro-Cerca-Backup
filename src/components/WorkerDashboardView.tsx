@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { ConfirmationResult } from 'firebase/auth';
 import { useStore } from '../context/StoreContext';
+import { FACEBOOK_AUTH_ENABLED } from '../config/featureFlags';
 import { WorkPhoto } from '../types';
 import { WorkerAvatar } from './WorkerAvatar';
 import { VerificationRadialProgress, VerificationRequirementItem } from './VerificationRadialProgress';
@@ -1779,7 +1780,8 @@ export const WorkerDashboardView: React.FC = () => {
                     )}
                   </div>
 
-                  {!isFacebookLinked && (
+                  {/* Linking disabled for the MVP (FACEBOOK_AUTH_ENABLED flag) */}
+                  {!isFacebookLinked && FACEBOOK_AUTH_ENABLED && (
                     <button
                       type="button"
                       disabled={isLinkingFacebook}
@@ -1795,6 +1797,9 @@ export const WorkerDashboardView: React.FC = () => {
                         <span>Vincular Facebook</span>
                       )}
                     </button>
+                  )}
+                  {!isFacebookLinked && !FACEBOOK_AUTH_ENABLED && (
+                    <p className="text-[11px] text-slate-400 text-center italic">Disponible próximamente</p>
                   )}
                 </div>
               </div>
