@@ -73,6 +73,7 @@ import { sanitizeMexicanPhone, buildWhatsAppUrl } from '../lib/whatsapp';
 import { sanitizeText, sanitizeRecord, checkRateLimit, removeUndefinedFields } from '../lib/sanitize';
 import { calculateHaversineDistance, distanceFromZibata, coversZibata } from '../lib/geo';
 import { DESIGNATED_ADMIN_EMAILS, isAdminEmail, isUserAdmin } from '../config/admins';
+import { AUTO_APPROVE_PROFILE_PHOTOS } from '../config/featureFlags';
 
 // Re-export centralized admin governance for backward compatibility
 export { DESIGNATED_ADMIN_EMAILS, isAdminEmail, isUserAdmin };
@@ -2195,6 +2196,52 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Worker submitting a newly uploaded pending photo for administrative moderation
   const submitPendingProfilePhoto = useCallback(
     async (workerId: string, pendingStoragePath: string): Promise<{ success: boolean; error?: string }> => {
+      // MVP: skip admin moderation and publish the photo immediately (see featureFlags.ts).
+      // Routed through a backend endpoint (Admin SDK) rather than a direct client write,
+      // because Firestore rules deliberately forbid owners from setting
+      // profilePhotoReviewStatus to 'approved' themselves.
+      if (AUTO_APPROVE_PROFILE_PHOTOS) {
+        try {
+          const currentUser = auth.currentUser;
+          if (!currentUser) {
+            return { success: false, error: 'Debes tener una sesión activa para publicar tu foto.' };
+          }
+          const token = await currentUser.getIdToken();
+          const res = await fetch('/api/photos/self-publish', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ pendingStoragePath }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            return { success: false, error: data?.error || 'No se pudo publicar la fotografía.' };
+          }
+
+          setMaestros((prev) =>
+            prev.map((w) =>
+              w.id === workerId || w.userId === workerId
+                ? {
+                    ...w,
+                    profilePhoto: data.publicUrl,
+                    fotoUrl: data.publicUrl,
+                    photoUrl: data.publicUrl,
+                    profilePhotoReviewStatus: 'approved',
+                    pendingProfilePhotoPath: undefined,
+                  }
+                : w
+            )
+          );
+
+          return { success: true };
+        } catch (err: any) {
+          console.error('Error self-publishing profile photo:', err);
+          return { success: false, error: err?.message || 'Error al publicar la fotografía.' };
+        }
+      }
+
       try {
         const nowIso = new Date().toISOString();
         // 1. Save in private subdocument /maestros/{workerId}/privado/media

@@ -1742,6 +1742,95 @@ async function startServer() {
   });
 
   // =========================================================================
+  // WORKER SELF-PUBLISH PROFILE PHOTO ENDPOINT (MVP: no admin approval required)
+  // POST /api/photos/self-publish
+  //
+  // Mirrors the "approve" branch of /api/admin/profile-photo/review, but callable
+  // by the photo's OWNER instead of an admin: the uid comes from the verified
+  // Firebase ID token, never from the request body, and the pending storage path
+  // must live under that same uid's own pending prefix. Gated client-side by the
+  // AUTO_APPROVE_PROFILE_PHOTOS flag (src/config/featureFlags.ts) so the manual
+  // admin-review flow can be restored later without touching this endpoint.
+  // =========================================================================
+  app.post("/api/photos/self-publish", async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "No autorizado. Token de sesión requerido." });
+      }
+
+      const token = authHeader.split(" ")[1];
+      let decodedToken: any;
+      try {
+        decodedToken = await adminAuth.verifyIdToken(token);
+      } catch {
+        return res.status(401).json({ error: "Token de sesión inválido o expirado." });
+      }
+
+      const workerId = decodedToken.uid;
+      const { pendingStoragePath } = req.body || {};
+      const expectedPrefix = `profile-photos-pending/${workerId}/`;
+
+      if (!pendingStoragePath || typeof pendingStoragePath !== "string" || !pendingStoragePath.startsWith(expectedPrefix)) {
+        return res.status(400).json({ error: "Ruta de fotografía pendiente inválida para este usuario." });
+      }
+
+      const workerRef = adminDb.collection("maestros").doc(workerId);
+      const workerSnap = await workerRef.get();
+      if (!workerSnap.exists) {
+        return res.status(404).json({ error: "Perfil de trabajador no encontrado." });
+      }
+
+      const bucket = adminStorage.bucket();
+      const sourceFile = bucket.file(pendingStoragePath);
+      const [fileExists] = await sourceFile.exists();
+      if (!fileExists) {
+        return res.status(400).json({ error: "La fotografía pendiente no se encontró en Storage." });
+      }
+
+      const fileName = path.basename(pendingStoragePath);
+      const publicPath = `profile-photos-public/${workerId}/${fileName}`;
+      const destFile = bucket.file(publicPath);
+
+      await sourceFile.copy(destFile);
+      const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(publicPath)}?alt=media`;
+
+      try {
+        await sourceFile.delete();
+      } catch (delErr) {
+        console.warn("[Photo Self-Publish] Could not delete pending source file:", delErr);
+      }
+
+      const nowIso = new Date().toISOString();
+      await workerRef.update({
+        profilePhoto: publicUrl,
+        fotoUrl: publicUrl,
+        photoUrl: publicUrl,
+        profilePhotoReviewStatus: "approved",
+        pendingProfilePhotoPath: null,
+        profilePhotoReviewedAt: nowIso,
+        updatedAt: nowIso,
+      });
+
+      await adminDb.collection("maestros").doc(workerId).collection("privado").doc("media").set(
+        {
+          profilePhotoReviewStatus: "approved",
+          pendingProfilePhotoPath: null,
+          approvedPublicUrl: publicUrl,
+          reviewedAt: nowIso,
+          reviewedBy: "self_publish_mvp",
+        },
+        { merge: true }
+      );
+
+      return res.status(200).json({ success: true, publicUrl });
+    } catch (err: any) {
+      console.error("[Photo Self-Publish Error]:", err);
+      return res.status(500).json({ error: err?.message || "Error al publicar la fotografía de perfil." });
+    }
+  });
+
+  // =========================================================================
   // ADMIN GET PROFILE REPORTS
   // GET /api/admin/profile-reports
   // =========================================================================
