@@ -1,39 +1,106 @@
-import React, { useState } from 'react';
-import { 
-  Search, 
-  MapPin, 
-  Hammer, 
-  Wrench, 
-  Zap, 
-  Paintbrush, 
-  Scissors, 
-  Layers, 
-  ShieldCheck, 
-  CheckCircle2, 
-  ArrowRight, 
-  PhoneCall, 
-  Users, 
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  Search,
+  MapPin,
+  Hammer,
+  Wrench,
+  Zap,
+  Paintbrush,
+  Scissors,
+  Layers,
+  ShieldCheck,
+  CheckCircle2,
+  ArrowRight,
+  PhoneCall,
+  Users,
   Image as ImageIcon,
   Sparkles,
   Award,
   ChevronRight
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { Trade, isPubliclyVisible } from '../types';
+import { Trade, Worker, isPubliclyVisible } from '../types';
+import { WorkerMarketplaceCard } from './WorkerMarketplaceCard';
 
 export const HomeView: React.FC = () => {
   const { trades, serviceAreas, workers, navigateTo, trackSearch } = useStore();
   const [selectedTrade, setSelectedTrade] = useState<string>('');
+  const [tradeQuery, setTradeQuery] = useState<string>('');
   const [selectedArea, setSelectedArea] = useState<string>('');
+  const [showTradeSuggestions, setShowTradeSuggestions] = useState<boolean>(false);
+  const tradeFieldRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    trackSearch(selectedTrade || undefined, selectedArea || undefined);
+    const finalTrade = selectedTrade || tradeQuery.trim();
+    trackSearch(finalTrade || undefined, selectedArea || undefined);
     navigateTo({
       type: 'search',
-      trade: selectedTrade || undefined,
+      trade: finalTrade || undefined,
       area: selectedArea || undefined,
     });
+  };
+
+  const handlePickTrade = (name: string) => {
+    setSelectedTrade(name);
+    setTradeQuery(name);
+    setShowTradeSuggestions(false);
+  };
+
+  const tradeSuggestions = useMemo(() => {
+    const q = tradeQuery.trim().toLowerCase();
+    if (!q) return [];
+    return trades.filter((t) => t.active && t.name.toLowerCase().includes(q)).slice(0, 6);
+  }, [tradeQuery, trades]);
+
+  // Close the suggestions dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tradeFieldRef.current && !tradeFieldRef.current.contains(event.target as Node)) {
+        setShowTradeSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Rotating placeholder words (superprof.mx-style) cycling through popular trades
+  const rotatingTradeNames = useMemo(() => {
+    const names = trades.filter((t) => t.popular && t.active).map((t) => t.name);
+    return names.length > 0 ? names : ['Albañil', 'Plomero', 'Electricista'];
+  }, [trades]);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [placeholderVisible, setPlaceholderVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderVisible(false);
+      setTimeout(() => {
+        setPlaceholderIndex((i) => (i + 1) % rotatingTradeNames.length);
+        setPlaceholderVisible(true);
+      }, 220);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, [rotatingTradeNames]);
+
+  // Featured worker profiles for the homepage marketplace grid
+  const featuredWorkers = useMemo(() => {
+    return workers
+      .filter(isPubliclyVisible)
+      .sort((a, b) => {
+        const aVerif = a.verificado === true || a.verificationStatus === 'verified';
+        const bVerif = b.verificado === true || b.verificationStatus === 'verified';
+        if (aVerif && !bVerif) return -1;
+        if (!aVerif && bVerif) return 1;
+        const aPhotos = a.workPhotos?.length || a.fotosTrabajos?.length || 0;
+        const bPhotos = b.workPhotos?.length || b.fotosTrabajos?.length || 0;
+        return bPhotos - aPhotos;
+      })
+      .slice(0, 6);
+  }, [workers]);
+
+  const handleOpenWorker = (worker: Worker) => {
+    navigateTo({ type: 'profile', workerSlug: worker.slug! });
   };
 
   const getTradeIcon = (iconName: string) => {
@@ -73,55 +140,88 @@ export const HomeView: React.FC = () => {
           {/* MAIN SEARCH BOX */}
           <div className="max-w-3xl mx-auto bg-white p-3 sm:p-4 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 text-left">
             <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-3">
-              
-              {/* Field 1: Oficio */}
-              <div className="md:col-span-5 relative">
+
+              {/* Field 1: Oficio (free text, animated rotating placeholder + suggestions) */}
+              <div ref={tradeFieldRef} className={`relative ${selectedArea || tradeQuery ? 'md:col-span-5' : 'md:col-span-9'}`}>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   ¿Qué necesitas?
                 </label>
                 <div className="relative">
-                  <select
-                    id="hero-trade-select"
-                    value={selectedTrade}
-                    onChange={(e) => setSelectedTrade(e.target.value)}
-                    className="w-full pl-10 pr-8 py-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-slate-800 font-medium text-sm sm:text-base focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="">Todos los oficios</option>
-                    {trades.filter((t) => t.active).map((trade) => (
-                      <option key={trade.id} value={trade.name}>
-                        {trade.name}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    id="hero-trade-input"
+                    type="text"
+                    autoComplete="off"
+                    value={tradeQuery}
+                    onChange={(e) => {
+                      setTradeQuery(e.target.value);
+                      setSelectedTrade('');
+                      setShowTradeSuggestions(true);
+                    }}
+                    onFocus={() => setShowTradeSuggestions(true)}
+                    className="w-full pl-10 pr-8 py-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-slate-800 font-medium text-sm sm:text-base focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                  />
                   <Hammer className="w-5 h-5 text-orange-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+
+                  {/* Animated rotating placeholder overlay, superprof.mx-style */}
+                  {!tradeQuery && (
+                    <div className="absolute left-10 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1.5 text-sm sm:text-base text-slate-400">
+                      <span>Ej.</span>
+                      <span
+                        className={`font-semibold text-slate-500 transition-all duration-200 ${
+                          placeholderVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1'
+                        }`}
+                      >
+                        {rotatingTradeNames[placeholderIndex]}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Suggestions dropdown */}
+                  {showTradeSuggestions && tradeSuggestions.length > 0 && (
+                    <div className="absolute z-20 top-full mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                      {tradeSuggestions.map((trade) => (
+                        <button
+                          key={trade.id}
+                          type="button"
+                          onClick={() => handlePickTrade(trade.name)}
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-700 transition-colors cursor-pointer flex items-center gap-2"
+                        >
+                          <Hammer className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                          <span>{trade.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Field 2: Zona */}
-              <div className="md:col-span-4 relative">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  ¿Dónde necesitas el trabajo?
-                </label>
-                <div className="relative">
-                  <select
-                    id="hero-area-select"
-                    value={selectedArea}
-                    onChange={(e) => setSelectedArea(e.target.value)}
-                    className="w-full pl-10 pr-8 py-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-slate-800 font-medium text-sm sm:text-base focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="">Todas las ubicaciones</option>
-                    {serviceAreas.filter((a) => a.active).map((area) => (
-                      <option key={area.id} value={area.name}>
-                        {area.name} ({area.municipality})
-                      </option>
-                    ))}
-                  </select>
-                  <MapPin className="w-5 h-5 text-orange-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              {/* Field 2: Zona — only appears once the worker has started typing what they need */}
+              {(tradeQuery || selectedArea) && (
+                <div className="md:col-span-4 relative animate-in fade-in slide-in-from-left-2 duration-300">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    ¿Dónde necesitas el trabajo?
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="hero-area-select"
+                      value={selectedArea}
+                      onChange={(e) => setSelectedArea(e.target.value)}
+                      className="w-full pl-10 pr-8 py-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-slate-800 font-medium text-sm sm:text-base focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Todas las ubicaciones</option>
+                      {serviceAreas.filter((a) => a.active).map((area) => (
+                        <option key={area.id} value={area.name}>
+                          {area.name} ({area.municipality})
+                        </option>
+                      ))}
+                    </select>
+                    <MapPin className="w-5 h-5 text-orange-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Submit CTA */}
-              <div className="md:col-span-3 flex items-end">
+              <div className={`flex items-end ${tradeQuery || selectedArea ? 'md:col-span-3' : 'md:col-span-3'}`}>
                 <button
                   type="submit"
                   id="hero-search-submit-btn"
@@ -133,34 +233,39 @@ export const HomeView: React.FC = () => {
               </div>
 
             </form>
-
-            {/* Popular quick tags */}
-            <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-              <span className="font-semibold text-slate-700">Populares:</span>
-              {['Albañil', 'Plomero', 'Electricista', 'Pintor', 'Juriquilla', 'Corregidora'].map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => {
-                    const isArea = serviceAreas.some((a) => a.name.includes(tag));
-                    if (isArea) {
-                      trackSearch(undefined, tag);
-                      navigateTo({ type: 'search', area: tag });
-                    } else {
-                      trackSearch(tag, undefined);
-                      navigateTo({ type: 'search', trade: tag });
-                    }
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-orange-50 hover:text-orange-700 text-slate-700 transition-colors font-medium border border-slate-200/60 cursor-pointer"
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
           </div>
 
         </div>
       </section>
+
+      {/* 1.5 TRABAJADORES DESTACADOS (Marketplace grid, superprof.mx-inspired) */}
+      {featuredWorkers.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-[70px]">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Trabajadores disponibles cerca de ti
+              </h2>
+              <p className="text-slate-600 text-sm sm:text-base mt-1">
+                Perfiles reales, con fotos de trabajos terminados
+              </p>
+            </div>
+            <button
+              onClick={() => navigateTo({ type: 'search' })}
+              className="inline-flex items-center gap-1.5 text-orange-600 hover:text-orange-700 font-bold text-sm hover:underline cursor-pointer shrink-0"
+            >
+              <span>Ver todos los trabajadores</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            {featuredWorkers.map((worker) => (
+              <WorkerMarketplaceCard key={worker.id} worker={worker} onOpen={handleOpenWorker} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 2. OFICIOS POPULARES */}
       <section className="max-w-7xl mx-auto px-8 mb-[70px]">

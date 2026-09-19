@@ -33,32 +33,21 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center justify-between h-16 sm:h-20">
           
           {/* Logo */}
-          <div 
+          <div
             id="brand-logo"
             onClick={() => handleNav(() => navigateTo({ type: 'home' }))}
-            className="cursor-pointer select-none flex items-center"
+            title="Ir a la página principal"
+            className="cursor-pointer select-none flex items-center hover:opacity-80 transition-opacity"
           >
-            <img 
+            <img
               src="/Logo%20Oficial%20para%20sitio%20web.jpg"
-              alt="Maestro Cerca Logo"
+              alt="Maestro Cerca - Ir a la página principal"
               className="h-10 sm:h-12 w-auto object-contain pl-[22px] pt-[2px] pr-0 pb-[3px]"
             />
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-1 lg:gap-2">
-            <button
-              id="nav-home-btn"
-              onClick={() => navigateTo({ type: 'home' })}
-              className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                isActive('home') 
-                  ? 'text-orange-600 bg-orange-50 font-semibold' 
-                  : 'text-slate-600 hover:text-orange-600 hover:bg-slate-50'
-              }`}
-            >
-              <span>Página principal</span>
-            </button>
-
             <button
               id="nav-search-btn"
               onClick={() => navigateTo({ type: 'search' })}
@@ -189,16 +178,6 @@ export const Navbar: React.FC = () => {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-6 space-y-3 shadow-xl">
           <div className="space-y-1">
-            <button
-              onClick={() => handleNav(() => navigateTo({ type: 'home' }))}
-              className={`w-full text-left px-3.5 py-2.5 rounded-xl font-medium text-sm flex items-center justify-between ${
-                isActive('home') ? 'bg-orange-50 text-orange-600 font-bold' : 'text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <span>Página principal</span>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </button>
-
             <button
               onClick={() => handleNav(() => navigateTo({ type: 'search' }))}
               className={`w-full text-left px-3.5 py-2.5 rounded-xl font-medium text-sm flex items-center justify-between ${
