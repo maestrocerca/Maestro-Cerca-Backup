@@ -1212,12 +1212,24 @@ async function startServer() {
       }
 
       const body = req.body || {};
-      const rawPhone = (body.telefono || body.whatsapp_id || body.phone || "").toString().trim();
       const action = (body.action || "status").toString().trim().toLowerCase();
 
-      const { e164, isValid } = normalizeMexicanPhone(rawPhone);
+      // Same identity-anchor pattern as /api/manychat/finalize-registration:
+      // never trust a free-text phone answer, only the verified WhatsApp
+      // number found in whatsapp_id or Full Contact Data's whatsapp_phone.
+      let fullContact: any = body.full_contact;
+      if (typeof fullContact === "string") {
+        try { fullContact = JSON.parse(fullContact); } catch { fullContact = null; }
+      }
+      const rawWhatsAppId =
+        (typeof body.whatsapp_id === "string" && body.whatsapp_id.trim()) ||
+        (fullContact && typeof fullContact.whatsapp_phone === "string" && fullContact.whatsapp_phone) ||
+        (fullContact && typeof fullContact.whatsapp_id === "string" && fullContact.whatsapp_id) ||
+        "";
+
+      const { e164, isValid } = normalizeMexicanPhone(rawWhatsAppId);
       if (!isValid) {
-        res.status(400).json({ success: false, error: "NÃºmero de telÃ©fono no vÃ¡lido." });
+        res.status(400).json({ success: false, error: "No se encontrÃ³ un WhatsApp verificado vÃ¡lido. EnvÃ­a whatsapp_id o full_contact." });
         return;
       }
 
