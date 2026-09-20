@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { 
   User, 
   Briefcase, 
@@ -199,9 +199,9 @@ export const WorkerDashboardView: React.FC = () => {
 
   if (!firebaseUser) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center bg-[#FAFAFA] py-16 px-4">
+      <div className="min-h-[70vh] flex items-center justify-center bg-[#FAF8F5] py-16 px-4">
         <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xs text-center space-y-5">
-          <div className="w-14 h-14 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mx-auto">
+          <div className="w-14 h-14 bg-orange-100 text-[#FF6B00] rounded-2xl flex items-center justify-center mx-auto">
             <User className="w-7 h-7" />
           </div>
           <div className="space-y-2">
@@ -212,7 +212,7 @@ export const WorkerDashboardView: React.FC = () => {
           </div>
           <button
             onClick={() => navigateTo({ type: 'login' })}
-            className="w-full py-3.5 px-6 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="w-full py-3.5 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
           >
             Iniciar sesión
           </button>
@@ -223,7 +223,7 @@ export const WorkerDashboardView: React.FC = () => {
 
   if (!currentWorker) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center bg-[#FAFAFA] py-16 px-4">
+      <div className="min-h-[70vh] flex items-center justify-center bg-[#FAF8F5] py-16 px-4">
         <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xs text-center space-y-5">
           <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
             <AlertCircle className="w-7 h-7" />
@@ -237,7 +237,7 @@ export const WorkerDashboardView: React.FC = () => {
           <div className="space-y-2.5 pt-2">
             <button
               onClick={() => navigateTo({ type: 'register' })}
-              className="w-full py-3.5 px-6 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="w-full py-3.5 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
             >
               Completar mi registro
             </button>
@@ -775,7 +775,7 @@ export const WorkerDashboardView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#FAF8F5] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
         
         {/* One-time ManyChat / WhatsApp claimed profile notification */}
@@ -888,7 +888,7 @@ export const WorkerDashboardView: React.FC = () => {
                   });
                 }, 100);
               }}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-black text-xs sm:text-sm rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
             >
               <Camera className="w-4 h-4" />
               <span>SUBIR FOTO</span>
@@ -938,7 +938,7 @@ export const WorkerDashboardView: React.FC = () => {
 
               {/* Accessible Camera badge on bottom-right corner */}
               <label 
-                className="absolute -bottom-1.5 -right-1.5 p-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-md cursor-pointer transition-all hover:scale-110 active:scale-95 z-20 flex items-center justify-center"
+                className="absolute -bottom-1.5 -right-1.5 p-2 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white rounded-xl shadow-md cursor-pointer transition-all hover:scale-110 active:scale-95 z-20 flex items-center justify-center"
                 title="Cambiar foto de perfil (JPG, PNG, WebP máx. 5MB)"
               >
                 <Camera className="w-3.5 h-3.5" />
@@ -981,7 +981,7 @@ export const WorkerDashboardView: React.FC = () => {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2.5">
-                <p className="text-sm sm:text-base font-bold text-orange-600">{currentWorker.mainTrade}</p>
+                <p className="text-sm sm:text-base font-bold text-[#FF6B00]">{currentWorker.mainTrade}</p>
                 {currentWorker.profilePhotoReviewStatus === 'pending' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold">
                     <Clock className="w-3 h-3 text-amber-700" />
@@ -1149,7 +1149,7 @@ export const WorkerDashboardView: React.FC = () => {
         <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-2">
           <div className="flex justify-between items-center text-xs font-bold">
             <span className="text-slate-700">Completitud de tu perfil</span>
-            <span className="text-orange-600">{completionScore}%</span>
+            <span className="text-[#FF6B00]">{completionScore}%</span>
           </div>
           <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
             <div
@@ -1209,7 +1209,7 @@ export const WorkerDashboardView: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-2xl bg-orange-100 text-[#FF6B00] flex items-center justify-center shrink-0">
                       <ShieldCheck className="w-5 h-5" />
                     </div>
                     <div>
@@ -1274,7 +1274,7 @@ export const WorkerDashboardView: React.FC = () => {
                   {(verifSubmitted || currentWorker.tieneVerificacionPendiente || currentWorker.verificationRequest?.status === 'pending') ? (
                     <div className="p-5 rounded-2xl bg-slate-100 border border-slate-200 text-slate-800 space-y-2">
                       <div className="flex items-center gap-2 font-black text-sm text-slate-900">
-                        <Clock className="w-5 h-5 text-orange-600 shrink-0" />
+                        <Clock className="w-5 h-5 text-[#FF6B00] shrink-0" />
                         <span>Solicitud en revisión</span>
                       </div>
                       <p className="text-xs text-slate-600 leading-relaxed">
@@ -1339,7 +1339,7 @@ export const WorkerDashboardView: React.FC = () => {
                         <button
                           type="submit"
                           disabled={!allVerificationRequirementsMet || isSubmittingVerif}
-                          className="w-full py-3.5 px-6 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:cursor-not-allowed"
+                          className="w-full py-3.5 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:cursor-not-allowed"
                         >
                           {isSubmittingVerif ? (
                             <>
@@ -1419,7 +1419,7 @@ export const WorkerDashboardView: React.FC = () => {
                             document.getElementById('access-methods-section')?.scrollIntoView({ behavior: 'smooth' });
                             setShowPhoneLinkForm(true);
                           }}
-                          className="text-[10px] font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
+                          className="text-[10px] font-bold text-[#FF6B00] hover:text-orange-700 underline cursor-pointer"
                         >
                           Verificar
                         </button>
@@ -1627,7 +1627,7 @@ export const WorkerDashboardView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="py-3 px-6 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white font-bold text-sm rounded-xl shadow-xs flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed transition-colors"
+                  className="py-3 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] disabled:bg-orange-400 text-white font-bold text-sm rounded-xl shadow-xs flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed transition-colors"
                 >
                   {isSaving ? (
                     <>
@@ -1648,7 +1648,7 @@ export const WorkerDashboardView: React.FC = () => {
             <div id="access-methods-section" className="mt-8 pt-6 border-t border-slate-200 space-y-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Link2 className="w-4 h-4 text-orange-600" />
+                  <Link2 className="w-4 h-4 text-[#FF6B00]" />
                   <span>Métodos de acceso</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -1736,7 +1736,7 @@ export const WorkerDashboardView: React.FC = () => {
                                 <button
                                   type="submit"
                                   disabled={isSendingPhoneSms || linkPhoneDigits.length !== 10}
-                                  className="flex-1 py-1.5 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                                  className="flex-1 py-1.5 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] disabled:bg-orange-300 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
                                 >
                                   {isSendingPhoneSms ? 'Enviando...' : 'Enviar SMS'}
                                 </button>
@@ -1923,7 +1923,7 @@ export const WorkerDashboardView: React.FC = () => {
                   }`}
                 >
                   <div className="flex flex-col items-center justify-center gap-2">
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-orange-100 text-[#FF6B00] flex items-center justify-center">
                       <Upload className="w-5 h-5" />
                     </div>
                     <div>
@@ -1935,7 +1935,7 @@ export const WorkerDashboardView: React.FC = () => {
                       </p>
                     </div>
 
-                    <label className="cursor-pointer mt-2 inline-flex items-center gap-2 py-2 px-4 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors">
+                    <label className="cursor-pointer mt-2 inline-flex items-center gap-2 py-2 px-4 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white text-xs font-bold rounded-xl shadow-xs transition-colors">
                       <Plus className="w-4 h-4" />
                       <span>Seleccionar archivos</span>
                       <input

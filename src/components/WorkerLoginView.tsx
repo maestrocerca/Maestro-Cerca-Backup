@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   Phone, 
   ArrowRight, 
@@ -232,19 +232,19 @@ export const WorkerLoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+    <div className="min-h-screen bg-[#FAF8F5] py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
       <div className="max-w-md w-full space-y-8">
-        
+
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto shadow-xs overflow-hidden">
-            <img 
-              src={loginHeaderImage} 
-              alt="Maestro Cerca" 
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto shadow-xs overflow-hidden">
+            <img
+              src={loginHeaderImage}
+              alt="Maestro Cerca"
               className="w-full h-full object-cover"
             />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
             Acceso para trabajadores
           </h1>
           <p className="text-slate-600 text-sm">
@@ -253,7 +253,7 @@ export const WorkerLoginView: React.FC = () => {
         </div>
 
         {/* Main Card */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
+        <div key={step} className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6 animate-fadeIn">
           
           {/* Error notice */}
           {error && (
@@ -279,7 +279,7 @@ export const WorkerLoginView: React.FC = () => {
                 type="button"
                 id="login-to-register-btn"
                 onClick={() => navigateTo({ type: 'register' })}
-                className="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2.5 px-4 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Registrarme de forma gratuita</span>
                 <ArrowRight className="w-4 h-4" />
@@ -328,7 +328,7 @@ export const WorkerLoginView: React.FC = () => {
                   type="submit"
                   id="send-sms-btn"
                   disabled={isLoading || isFacebookLoading || cleanPhoneDigits.length !== 10}
-                  className="w-full py-3.5 px-4 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full py-3.5 px-4 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <>
@@ -392,20 +392,17 @@ export const WorkerLoginView: React.FC = () => {
           {/* STEP 2: SMS Code input */}
           {step === 2 && (
             <form onSubmit={handleConfirmCode} className="space-y-5">
-              <div className="p-3.5 bg-orange-50 border border-orange-200 rounded-2xl flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <span className="text-[10px] font-bold uppercase text-orange-800 tracking-wider">Código enviado al</span>
-                  <p className="text-sm font-black text-slate-900">
-                    +52 {formatPhoneForDisplay(cleanPhoneDigits)}
-                  </p>
-                </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-600">
+                  Código enviado a <strong className="text-slate-900">+52 {formatPhoneForDisplay(cleanPhoneDigits)}</strong>
+                </p>
                 <button
                   type="button"
                   onClick={() => {
                     setStep(1);
                     setError('');
                   }}
-                  className="text-xs font-bold text-orange-700 hover:text-orange-900 underline cursor-pointer"
+                  className="text-xs font-bold text-[#FF6B00] hover:text-[#e65f00] underline cursor-pointer shrink-0"
                 >
                   Cambiar
                 </button>
@@ -435,7 +432,7 @@ export const WorkerLoginView: React.FC = () => {
                 type="submit"
                 id="confirm-code-btn"
                 disabled={isLoading || smsCode.replace(/\D/g, '').length < 6}
-                className="w-full py-3.5 px-4 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                className="w-full py-3.5 px-4 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <>
@@ -460,7 +457,7 @@ export const WorkerLoginView: React.FC = () => {
                     type="button"
                     onClick={handleResendCode}
                     disabled={isLoading}
-                    className="text-xs text-orange-600 hover:text-orange-700 font-bold flex items-center gap-1.5 cursor-pointer"
+                    className="text-xs text-[#FF6B00] hover:text-[#e65f00] font-bold flex items-center gap-1.5 cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Reenviar código por SMS</span>
@@ -477,7 +474,7 @@ export const WorkerLoginView: React.FC = () => {
               type="button"
               id="worker-register-link-footer"
               onClick={() => navigateTo({ type: 'register' })}
-              className="text-orange-600 font-bold hover:underline cursor-pointer"
+              className="text-[#FF6B00] font-bold hover:underline cursor-pointer"
             >
               Registra tu perfil gratis aquí
             </button>
