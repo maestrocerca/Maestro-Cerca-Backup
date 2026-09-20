@@ -1186,6 +1186,31 @@ async function startServer() {
   app.delete("/api/account", handleAccountDeletion);
   app.post("/api/account/delete", handleAccountDeletion);
 
+  /**
+   * Best-effort audit trail for /api/manychat/account-action. Never throws —
+   * a logging failure must not block or fail the underlying account action.
+   * Firestore-side, this collection is admin-read-only and not writable by
+   * any client (see firestore.rules), so it can't be tampered with from the
+   * outside even if other credentials leak.
+   */
+  async function logAccountActionAudit(entry: {
+    action: string;
+    callerIp: string;
+    whatsappE164?: string;
+    targetUid?: string;
+    success: boolean;
+    message: string;
+  }): Promise<void> {
+    try {
+      await adminDb.collection("auditoria_cuentas").add({
+        ...entry,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (auditErr: any) {
+      console.error("[Account Action Audit] Failed to write audit log entry:", auditErr?.message);
+    }
+  }
+
   // =========================================================================
   // MANYCHAT ACCOUNT MENU ENDPOINT
   // POST /api/manychat/account-action
@@ -1193,13 +1218,20 @@ async function startServer() {
   // Lets the WhatsApp flow, once it recognizes a returning phone number, let
   // that worker check their status, pause their public listing, or delete
   // their account entirely, without a Firebase Auth ID token (WhatsApp has no
-  // such concept) — authenticated instead by the same MANYCHAT_WEBHOOK_SECRET
-  // used by the rest of the ManyChat integration, and scoped strictly to the
-  // Auth user matching the sender's own verified WhatsApp phone number.
+  // such concept) — authenticated by a DEDICATED secret
+  // (MANYCHAT_ACCOUNT_ACTION_SECRET), intentionally separate from
+  // MANYCHAT_WEBHOOK_SECRET (which is configured in many more places across
+  // the ManyChat flow and therefore has a larger leak surface) since this
+  // endpoint alone can trigger an irreversible account deletion. Scoped
+  // strictly to the Auth user matching the sender's own verified WhatsApp
+  // phone number. Every call is recorded to the auditoria_cuentas collection
+  // for after-the-fact detection, since a leaked secret can't be fully ruled
+  // out for a value that lives inside a third-party SaaS UI.
   // =========================================================================
   app.post("/api/manychat/account-action", manyChatWebhookRateLimit, async (req: Request, res: Response): Promise<void> => {
+    const callerIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown-client";
     try {
-      const expectedSecret = process.env.MANYCHAT_WEBHOOK_SECRET;
+      const expectedSecret = process.env.MANYCHAT_ACCOUNT_ACTION_SECRET;
       if (!expectedSecret || expectedSecret.trim() === "") {
         res.status(503).json({ success: false, error: "Servicio no configurado" });
         return;
@@ -1207,6 +1239,7 @@ async function startServer() {
       const rawHeaderKey = req.get("x-api-key") || (req.headers["x-api-key"] as string | undefined);
       const apiKey = Array.isArray(rawHeaderKey) ? rawHeaderKey[0] : rawHeaderKey;
       if (!apiKey || !secretsMatch(apiKey, expectedSecret)) {
+        await logAccountActionAudit({ action: "unknown", callerIp, success: false, message: "Unauthorized: invalid or missing x-api-key" });
         res.status(401).json({ success: false, error: "Unauthorized" });
         return;
       }
@@ -1229,6 +1262,7 @@ async function startServer() {
 
       const { e164, isValid } = normalizeMexicanPhone(rawWhatsAppId);
       if (!isValid) {
+        await logAccountActionAudit({ action, callerIp, success: false, message: "Invalid/missing verified WhatsApp number" });
         res.status(400).json({ success: false, error: "No se encontrÃ³ un WhatsApp verificado vÃ¡lido. EnvÃ­a whatsapp_id o full_contact." });
         return;
       }
@@ -1238,6 +1272,7 @@ async function startServer() {
         authUser = await adminAuth.getUserByPhoneNumber(e164);
       } catch (lookupErr: any) {
         if (lookupErr?.code === "auth/user-not-found") {
+          await logAccountActionAudit({ action, callerIp, whatsappE164: e164, success: true, message: "No account exists for this phone" });
           res.status(200).json({ success: true, exists: false });
           return;
         }
@@ -1249,6 +1284,7 @@ async function startServer() {
       const workerSnap = await workerRef.get();
 
       if (!workerSnap.exists) {
+        await logAccountActionAudit({ action, callerIp, whatsappE164: e164, targetUid: uid, success: true, message: "Auth user exists but no worker profile" });
         res.status(200).json({ success: true, exists: false });
         return;
       }
@@ -1256,6 +1292,7 @@ async function startServer() {
       const data = workerSnap.data() || {};
 
       if (action === "status") {
+        await logAccountActionAudit({ action, callerIp, whatsappE164: e164, targetUid: uid, success: true, message: "Status queried" });
         res.status(200).json({
           success: true,
           exists: true,
@@ -1270,6 +1307,7 @@ async function startServer() {
 
       if (action === "pause") {
         if (data.pausado === true) {
+          await logAccountActionAudit({ action, callerIp, whatsappE164: e164, targetUid: uid, success: true, message: "Already paused, no-op" });
           res.status(200).json({ success: true, message: "Tu cuenta ya estaba pausada." });
           return;
         }
@@ -1279,12 +1317,14 @@ async function startServer() {
           aprobado: false,
           pausadoAt: new Date().toISOString(),
         });
+        await logAccountActionAudit({ action, callerIp, whatsappE164: e164, targetUid: uid, success: true, message: "Profile paused" });
         res.status(200).json({ success: true, message: "Tu perfil se pausÃ³ y ya no aparece en las bÃºsquedas pÃºblicas." });
         return;
       }
 
       if (action === "resume") {
         if (data.pausado !== true) {
+          await logAccountActionAudit({ action, callerIp, whatsappE164: e164, targetUid: uid, success: true, message: "Already active, no-op" });
           res.status(200).json({ success: true, message: "Tu cuenta ya estaba activa." });
           return;
         }
@@ -1292,6 +1332,7 @@ async function startServer() {
           pausado: false,
           aprobado: data.aprobadoPrePausa === true,
         });
+        await logAccountActionAudit({ action, callerIp, whatsappE164: e164, targetUid: uid, success: true, message: "Profile resumed" });
         res.status(200).json({ success: true, message: "Tu perfil se reactivÃ³." });
         return;
       }
@@ -1299,16 +1340,20 @@ async function startServer() {
       if (action === "delete") {
         const result: AccountDeletionResult = await performAccountDeletion(uid);
         if (result.success === false) {
+          await logAccountActionAudit({ action, callerIp, whatsappE164: e164, targetUid: uid, success: false, message: `Deletion failed at step ${result.step}: ${result.error}` });
           res.status(result.status).json({ success: false, error: result.error, step: result.step });
           return;
         }
+        await logAccountActionAudit({ action, callerIp, whatsappE164: e164, targetUid: uid, success: true, message: "Account permanently deleted" });
         res.status(200).json({ success: true, message: "Tu cuenta fue eliminada exitosamente.", deletedUid: result.deletedUid });
         return;
       }
 
+      await logAccountActionAudit({ action, callerIp, whatsappE164: e164, targetUid: uid, success: false, message: "Unrecognized action" });
       res.status(400).json({ success: false, error: "AcciÃ³n no reconocida." });
     } catch (err: any) {
       console.error("[ManyChat Account Action] Unhandled error:", err);
+      await logAccountActionAudit({ action: "unknown", callerIp, success: false, message: `Unhandled error: ${err?.message || "unknown"}` });
       res.status(500).json({ success: false, error: err?.message || "Error al procesar la solicitud." });
     }
   });

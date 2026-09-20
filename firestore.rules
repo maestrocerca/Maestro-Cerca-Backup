@@ -228,6 +228,15 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Audit trail for /api/manychat/account-action (pause/resume/delete via
+    // WhatsApp). Written only by the Admin SDK (bypasses these rules entirely),
+    // so "write: if false" here just makes sure no client can ever forge or
+    // tamper with an entry, even an authenticated admin's own browser session.
+    match /auditoria_cuentas/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Default deny all other unspecified documents
     match /{document=**} {
       allow read, write: if false;
