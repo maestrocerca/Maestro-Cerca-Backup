@@ -2208,6 +2208,119 @@ async function startServer() {
   });
 
   // =========================================================================
+  // ONE-TIME ADMIN WIPE: delete ALL test data before launch
+  // POST /api/admin/wipe-test-data
+  // Deletes every Firebase Auth user, every maestros/trabajadores_pendientes
+  // Firestore document (recursively, including subcollections) and their
+  // Storage files, and every solicitudes_contacto/reportes_perfil/
+  // auditoria_cuentas test record. Leaves catalog collections (trades,
+  // serviceAreas, catalogo_oficios, catalogo_zonas) untouched since those are
+  // real reference data, not test junk. Requires an explicit confirm string
+  // in the body so it can never be triggered by accident. Remove this
+  // endpoint once the pre-launch wipe is done and confirmed.
+  // =========================================================================
+  app.post("/api/admin/wipe-test-data", async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization || "";
+      if (!authHeader.startsWith("Bearer ")) {
+        res.status(401).json({ success: false, error: "No autorizado." });
+        return;
+      }
+      const token = authHeader.substring(7).trim();
+      let decodedToken: any;
+      try {
+        decodedToken = await adminAuth.verifyIdToken(token);
+      } catch {
+        res.status(401).json({ success: false, error: "Token invÃ¡lido o expirado." });
+        return;
+      }
+      if (decodedToken.admin !== true) {
+        res.status(403).json({ success: false, error: "Acceso denegado. Permisos de administrador requeridos." });
+        return;
+      }
+      if (req.body?.confirm !== "WIPE_ALL_TEST_DATA") {
+        res.status(400).json({ success: false, error: "Falta confirmaciÃ³n. EnvÃ­a { confirm: 'WIPE_ALL_TEST_DATA' } en el cuerpo." });
+        return;
+      }
+
+      let authUsersDeleted = 0;
+      let firestoreDocsDeleted = 0;
+      const errors: string[] = [];
+
+      // 1. Delete every Firebase Auth user (paginated).
+      try {
+        let pageToken: string | undefined;
+        const allUids: string[] = [];
+        do {
+          const page = await adminAuth.listUsers(1000, pageToken);
+          allUids.push(...page.users.map((u) => u.uid));
+          pageToken = page.pageToken;
+        } while (pageToken);
+        for (let i = 0; i < allUids.length; i += 1000) {
+          const batch = allUids.slice(i, i + 1000);
+          const result = await adminAuth.deleteUsers(batch);
+          authUsersDeleted += result.successCount;
+          if (result.failureCount > 0) {
+            errors.push(`Auth: ${result.failureCount} usuarios no se pudieron borrar.`);
+          }
+        }
+      } catch (err: any) {
+        errors.push(`Auth listUsers/deleteUsers error: ${err?.message}`);
+      }
+
+      // 2. Recursively delete every doc in these Firestore collections.
+      const collectionsToWipe = [
+        "maestros",
+        "trabajadores_pendientes",
+        "solicitudes_contacto",
+        "reportes_perfil",
+        "auditoria_cuentas",
+      ];
+      for (const collectionName of collectionsToWipe) {
+        try {
+          const snap = await adminDb.collection(collectionName).get();
+          for (const docSnap of snap.docs) {
+            await adminDb.recursiveDelete(docSnap.ref);
+            firestoreDocsDeleted++;
+          }
+        } catch (err: any) {
+          errors.push(`Firestore collection '${collectionName}' error: ${err?.message}`);
+        }
+      }
+
+      // 3. Delete every Storage object under the per-worker prefixes.
+      const storagePrefixes = [
+        "portafolios/",
+        "verificaciones/",
+        "profile-photos-pending/",
+        "profile-photos-public/",
+        "avatars/",
+      ];
+      const bucket = adminStorage.bucket();
+      for (const prefix of storagePrefixes) {
+        try {
+          await bucket.deleteFiles({ prefix });
+        } catch (err: any) {
+          if (err?.code !== 404) {
+            errors.push(`Storage prefix '${prefix}' error: ${err?.message}`);
+          }
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        authUsersDeleted,
+        firestoreDocsDeleted,
+        errors,
+        message: `Borrados ${authUsersDeleted} usuarios de Auth y ${firestoreDocsDeleted} documentos de Firestore. Storage limpiado.`,
+      });
+    } catch (err: any) {
+      console.error("[Wipe Test Data] Error:", err);
+      res.status(500).json({ success: false, error: err?.message || "Error al borrar los datos de prueba." });
+    }
+  });
+
+  // =========================================================================
   // ADMIN IMPORT LEADS ENDPOINT (ManyChat Leads Importer)
   // POST /api/admin/import-leads
   // =========================================================================
