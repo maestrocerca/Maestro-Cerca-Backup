@@ -412,7 +412,16 @@ async function startServer() {
     };
   }
 
-  const manyChatWebhookRateLimit = createRateLimiter(60 * 1000, 60); // 60 req/min per IP
+  // All ManyChat traffic (every WhatsApp user's conversation) arrives from
+  // ManyChat's own servers, not each end user's phone, so this bucket is
+  // effectively SHARED across every concurrent WhatsApp registration/menu
+  // interaction site-wide, not per real person. 60/min (1/sec) was sized for
+  // stopping a leaked-secret brute-force attempt, not real traffic, and would
+  // start throttling legitimate registrations once more than ~60 people are
+  // mid-conversation in the same minute. Raised to a ceiling generous enough
+  // for hundreds of concurrent users while still bounding a runaway abuse
+  // burst.
+  const manyChatWebhookRateLimit = createRateLimiter(60 * 1000, 600); // 600 req/min per IP
   const generateSlugRateLimit = createRateLimiter(60 * 1000, 20); // 20 req/min per IP
 
   // =========================================================================
