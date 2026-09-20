@@ -74,7 +74,7 @@ async function moderateImageContent(
 
   try {
     const response = await genAI.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.8-flash",
       contents: [
         {
           inlineData: {
