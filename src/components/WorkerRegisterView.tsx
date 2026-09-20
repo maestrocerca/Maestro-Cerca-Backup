@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CheckCircle2, 
   ShieldCheck, 
@@ -27,6 +27,7 @@ import {
 import { Worker, WorkPhoto } from '../types';
 import { auth } from '../lib/firebase';
 import { WorkerAvatar } from './WorkerAvatar';
+import { BrandLogoIcon } from './BrandLogo';
 import { uploadWorkerProfileImage, uploadWorkerWorkPhoto, validateImageFile } from '../lib/storage';
 import { FACEBOOK_AUTH_ENABLED } from '../config/featureFlags';
 
@@ -66,6 +67,27 @@ export const WorkerRegisterView: React.FC = () => {
   // Step 5: Fotografías, revisión previa y publicar perfil
   // Step 6: Confirmación de registro exitoso
   const [step, setStep] = useState<number>(1);
+
+  // Step 2 is a single-question-per-screen wizard (swipe-style, like the
+  // WhatsApp registration flow) instead of one long scrolling form.
+  const WIZARD_STEPS = [
+    'datos',
+    'oficio',
+    'experiencia',
+    'otros',
+    'disponibilidad',
+    'trabajos',
+    'zonas',
+    'fotoPerfil',
+    'fotosTrabajo',
+    'resumen',
+  ] as const;
+  const [wizardIndex, setWizardIndex] = useState(0);
+  const [swipeDirection, setSwipeDirection] = useState<'next' | 'back'>('next');
+  const goWizard = (index: number, direction: 'next' | 'back') => {
+    setSwipeDirection(direction);
+    setWizardIndex(Math.max(0, Math.min(WIZARD_STEPS.length - 1, index)));
+  };
 
   // Active onboarding registration registration flag
   useEffect(() => {
@@ -547,7 +569,7 @@ export const WorkerRegisterView: React.FC = () => {
     }
   };
 
-  const validateStep3AndContinue = () => {
+  const validateServicesAndContinue = () => {
     if (services.length < 1) {
       setServicesError('Agrega al menos un trabajo o servicio que realizas para continuar.');
       if (servicesSectionRef.current) {
@@ -558,7 +580,7 @@ export const WorkerRegisterView: React.FC = () => {
     }
     setServicesError('');
     setGeneralError('');
-    setStep(4);
+    goWizard(wizardIndex + 1, 'next');
   };
 
   const toggleServiceArea = (areaName: string) => {
@@ -586,42 +608,42 @@ export const WorkerRegisterView: React.FC = () => {
 
       if (!firstName.trim()) {
         setGeneralError('Por favor escribe tu nombre.');
-        setStep(2);
+        goWizard(0, 'back');
         setIsSubmitting(false);
         return;
       }
 
       if (!lastName.trim()) {
         setGeneralError('Por favor escribe tu primer apellido.');
-        setStep(2);
+        goWizard(0, 'back');
         setIsSubmitting(false);
         return;
       }
 
       if (clean10Digits.length !== 10) {
         setGeneralError('Por favor verifica que tu número de celular tenga 10 dígitos.');
-        setStep(2);
+        goWizard(0, 'back');
         setIsSubmitting(false);
         return;
       }
 
       if (!mainTrade.trim()) {
         setGeneralError('Por favor selecciona tu oficio principal.');
-        setStep(3);
+        goWizard(1, 'back');
         setIsSubmitting(false);
         return;
       }
 
       if (services.length === 0) {
         setGeneralError('Por favor selecciona al menos un trabajo que realizas.');
-        setStep(3);
+        goWizard(5, 'back');
         setIsSubmitting(false);
         return;
       }
 
       if (selectedAreas.length === 0) {
         setGeneralError('Por favor selecciona al menos una zona de trabajo.');
-        setStep(4);
+        goWizard(6, 'back');
         setIsSubmitting(false);
         return;
       }
@@ -879,35 +901,51 @@ export const WorkerRegisterView: React.FC = () => {
     }
   };
 
+  const wizardProgressPct = step === 1
+    ? 6
+    : step === 6
+    ? 100
+    : 10 + ((wizardIndex + 1) / WIZARD_STEPS.length) * 84;
+
   return (
-    <div className="min-h-screen bg-[#FAFAFA] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8">
-        
-        {/* Progress Bar & Cancel Link (Steps 1 to 5) */}
+    <div className="min-h-screen bg-[#FAF8F5] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-2xl mx-auto space-y-5 sm:space-y-6">
+
+        {/* Logo: always visible during registration */}
+        <div className="flex items-center justify-center">
+          <BrandLogoIcon size={44} />
+        </div>
+
+        {/* Progress Bar & Cancel Link */}
         {step < 6 && (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
+            <div className="w-full bg-slate-200/70 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-[#FF6B00] h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${wizardProgressPct}%` }}
+              />
+            </div>
             <div className="flex items-center justify-between">
+              {step === 2 ? (
+                <button
+                  type="button"
+                  onClick={() => wizardIndex === 0 ? setStep(1) : goWizard(wizardIndex - 1, 'back')}
+                  className="text-sm font-bold text-[#0C2340] hover:text-[#FF6B00] transition-colors cursor-pointer flex items-center gap-1 py-1 active:scale-95"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Atrás</span>
+                </button>
+              ) : <span />}
               <button
                 type="button"
                 id="btn-cancel-registration"
                 onClick={async () => {
                   await cancelWorkerRegistration();
                 }}
-                className="text-sm text-slate-500 hover:text-slate-900 font-medium transition-colors cursor-pointer flex items-center gap-1.5 py-1"
+                className="text-xs text-slate-400 hover:text-slate-700 font-semibold transition-colors cursor-pointer py-1"
               >
-                <span className="text-[14px] text-[#353643]">← Cancelar registro y volver al inicio</span>
+                Cancelar
               </button>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-slate-500">
-                <span>Paso {step} de 5</span>
-              </div>
-              <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                <div 
-                  className="bg-orange-600 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${(step / 5) * 100}%` }}
-                />
-              </div>
             </div>
           </div>
         )}
@@ -940,7 +978,7 @@ export const WorkerRegisterView: React.FC = () => {
         {step === 1 && (
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
             <div className="space-y-2">
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
                 Crea tu cuenta en Maestro Cerca
               </h1>
             </div>
@@ -1032,7 +1070,7 @@ export const WorkerRegisterView: React.FC = () => {
                   type="submit"
                   id="register-send-sms-btn"
                   disabled={isPhoneLoading || clean10Digits.length !== 10 || !privacyAccepted || !termsAccepted}
-                  className="w-full py-3.5 px-6 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm sm:text-base rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full py-3.5 px-6 bg-[#FF6B00] hover:bg-[#e65f00] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm sm:text-base rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {isPhoneLoading ? (
                     <>
@@ -1088,7 +1126,7 @@ export const WorkerRegisterView: React.FC = () => {
                   type="submit"
                   id="register-confirm-code-btn"
                   disabled={isPhoneLoading || smsCode.replace(/\D/g, '').length < 6}
-                  className="w-full py-3.5 px-6 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm sm:text-base rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full py-3.5 px-6 bg-[#FF6B00] hover:bg-[#e65f00] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm sm:text-base rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {isPhoneLoading ? (
                     <>
@@ -1174,81 +1212,80 @@ export const WorkerRegisterView: React.FC = () => {
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 2: DATOS PERSONALES Y DE CONTACTO */}
+        {/* STEP 2: PERFIL PASO A PASO (una pregunta por pantalla, estilo WhatsApp) */}
         {/* ========================================================================= */}
         {step === 2 && (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-            <div className="space-y-1.5">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Datos personales y de contacto
-              </h1>
-            </div>
+          <div
+            key={wizardIndex}
+            className={`bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6 ${
+              swipeDirection === 'next' ? 'wizard-slide-next' : 'wizard-slide-back'
+            }`}
+          >
+            {/* --- DATOS PERSONALES --- */}
+            {WIZARD_STEPS[wizardIndex] === 'datos' && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!firstName.trim()) {
+                    setGeneralError('Por favor escribe tu nombre.');
+                    return;
+                  }
+                  if (clean10Digits.length !== 10) {
+                    setGeneralError('Por favor ingresa tu número celular de contacto de 10 dígitos.');
+                    return;
+                  }
+                  setGeneralError('');
+                  goWizard(wizardIndex + 1, 'next');
+                }}
+                className="space-y-6"
+              >
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
+                  Tus datos personales
+                </h1>
 
-            {/* Unverified Phone Warning Banner for Facebook Authenticated Users */}
-            {!isPhoneAuthVerified && (
-              <div id="phone-unverified-banner" className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div className="text-xs space-y-1">
-                  <p className="font-bold text-amber-900 text-sm">Teléfono pendiente de verificar</p>
-                  <p className="text-amber-800 leading-relaxed">
-                    Iniciaste tu registro con Facebook. Puedes verificar tu número celular por SMS ahora o continuar y verificarlo más adelante desde tu panel de trabajador.
-                  </p>
-                </div>
-              </div>
-            )}
+                {!isPhoneAuthVerified && (
+                  <div id="phone-unverified-banner" className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="text-xs space-y-1">
+                      <p className="font-bold text-amber-900 text-sm">Teléfono pendiente de verificar</p>
+                      <p className="text-amber-800 leading-relaxed">
+                        Iniciaste tu registro con Facebook. Puedes verificar tu número celular por SMS ahora o continuar y verificarlo más adelante desde tu panel de trabajador.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!firstName.trim()) {
-                  setGeneralError('Por favor escribe tu nombre.');
-                  return;
-                }
-                if (clean10Digits.length !== 10) {
-                  setGeneralError('Por favor ingresa tu número celular de contacto de 10 dígitos.');
-                  return;
-                }
-                setGeneralError('');
-                setStep(3);
-              }}
-              className="space-y-5"
-            >
-              {/* Name and Last Name */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                    Nombre <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Roberto"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold focus:bg-white focus:outline-hidden focus:border-orange-500"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">
+                      Nombre <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      autoFocus
+                      placeholder="Ej. Roberto"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-base font-semibold focus:bg-white focus:outline-hidden focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00]/15 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">
+                      Primer apellido <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Sánchez"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-base font-semibold focus:bg-white focus:outline-hidden focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00]/15 transition-all"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                    Primer apellido <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Sánchez"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold focus:bg-white focus:outline-hidden focus:border-orange-500"
-                  />
-                </div>
-              </div>
 
-              {/* Phone Input: Verified vs Editable + In-line SMS Linking */}
-              {isPhoneAuthVerified && clean10Digits ? (
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                    Teléfono celular verificado
-                  </label>
+                {isPhoneAuthVerified && clean10Digits ? (
                   <div className="flex items-center justify-between p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -1256,225 +1293,198 @@ export const WorkerRegisterView: React.FC = () => {
                         +52 {formatPhoneForDisplay(clean10Digits)}
                       </span>
                     </div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">
-                      <span>✓ Verificado por SMS</span>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200">
+                      ✓ Verificado por SMS
                     </span>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-bold uppercase text-slate-700">
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">
                         Teléfono celular de contacto (10 dígitos) <span className="text-red-500">*</span>
                       </label>
-                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 text-amber-600" />
-                        <span>Teléfono pendiente de verificar</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center rounded-xl border border-slate-300 bg-slate-50 focus-within:bg-white focus-within:border-orange-600 overflow-hidden">
-                      <div className="px-3.5 py-3 bg-slate-100 border-r border-slate-300 text-slate-700 font-bold text-sm flex items-center gap-1 select-none">
-                        <span>🇲🇽</span>
-                        <span>+52</span>
-                      </div>
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        required
-                        placeholder="442 123 4567"
-                        value={rawPhone}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                          setRawPhone(val);
-                          if (linkSubStep === 'code') setLinkSubStep('idle');
-                        }}
-                        className="w-full p-3 bg-transparent text-slate-900 text-base font-bold tracking-wider placeholder:text-slate-400 placeholder:font-normal focus:outline-hidden"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Inline SMS verification box */}
-                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
-                    {linkSubStep === 'idle' ? (
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                        <div className="text-xs text-slate-600">
-                          <p className="font-bold text-slate-800">Verifica este número ahora</p>
-                          <p className="text-[11px]">Recibirás un código de 6 dígitos por mensaje SMS.</p>
+                      <div className="flex items-center rounded-2xl border border-slate-300 bg-slate-50 focus-within:bg-white focus-within:border-[#FF6B00] overflow-hidden">
+                        <div className="px-3.5 py-3 bg-slate-100 border-r border-slate-300 text-slate-700 font-bold text-sm flex items-center gap-1 select-none">
+                          <span>🇲🇽</span>
+                          <span>+52</span>
                         </div>
-                        <button
-                          type="button"
-                          disabled={clean10Digits.length !== 10 || isLinkingLoading}
-                          onClick={handleSendLinkSms}
-                          className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed shrink-0"
-                        >
-                          {isLinkingLoading ? (
-                            <>
-                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Enviando SMS...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Phone className="w-3.5 h-3.5" />
-                              <span>VERIFICAR POR SMS</span>
-                            </>
-                          )}
-                        </button>
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          required
+                          placeholder="442 123 4567"
+                          value={rawPhone}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            setRawPhone(val);
+                            if (linkSubStep === 'code') setLinkSubStep('idle');
+                          }}
+                          className="w-full p-3 bg-transparent text-slate-900 text-base font-bold tracking-wider placeholder:text-slate-400 placeholder:font-normal focus:outline-hidden"
+                        />
                       </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-bold text-slate-800">
-                            Ingresa el código enviado a +52 {formatPhoneForDisplay(clean10Digits)}:
-                          </p>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                      {linkSubStep === 'idle' ? (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <p className="text-xs font-bold text-slate-700">Verifica este número por SMS</p>
                           <button
                             type="button"
-                            onClick={() => { setLinkSubStep('idle'); setLinkSmsCode(''); }}
-                            className="text-[11px] text-slate-500 hover:text-slate-700 font-medium underline cursor-pointer"
-                          >
-                            Cambiar número
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={6}
-                            placeholder="123456"
-                            value={linkSmsCode}
-                            onChange={(e) => setLinkSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                            className="w-36 p-2.5 text-center text-lg font-black tracking-widest bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-orange-500"
-                          />
-                          <button
-                            type="button"
-                            disabled={linkSmsCode.length !== 6 || isLinkingLoading}
-                            onClick={handleConfirmLinkSms}
-                            className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+                            disabled={clean10Digits.length !== 10 || isLinkingLoading}
+                            onClick={handleSendLinkSms}
+                            className="px-4 py-2 bg-[#0C2340] hover:bg-[#153357] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed shrink-0"
                           >
                             {isLinkingLoading ? (
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             ) : (
                               <>
-                                <CheckCircle2 className="w-4 h-4" />
-                                <span>Confirmar SMS</span>
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>Verificar por SMS</span>
                               </>
                             )}
                           </button>
                         </div>
-
-                        {cooldown > 0 ? (
-                          <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            <span>Reenviar código en {cooldown}s</span>
-                          </p>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleSendLinkSms}
-                            className="text-[11px] text-orange-600 font-bold hover:underline cursor-pointer"
-                          >
-                            Reenviar código SMS
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {linkError && (
-                      <p className="text-xs text-red-600 font-semibold bg-red-50 p-2 rounded-lg border border-red-200">
-                        {linkError}
-                      </p>
-                    )}
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold text-slate-800">
+                              Código enviado a +52 {formatPhoneForDisplay(clean10Digits)}:
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => { setLinkSubStep('idle'); setLinkSmsCode(''); }}
+                              className="text-[11px] text-slate-500 hover:text-slate-700 font-medium underline cursor-pointer"
+                            >
+                              Cambiar número
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={6}
+                              placeholder="123456"
+                              value={linkSmsCode}
+                              onChange={(e) => setLinkSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              className="w-36 p-2.5 text-center text-lg font-black tracking-widest bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-[#FF6B00]"
+                            />
+                            <button
+                              type="button"
+                              disabled={linkSmsCode.length !== 6 || isLinkingLoading}
+                              onClick={handleConfirmLinkSms}
+                              className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+                            >
+                              {isLinkingLoading ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span>Confirmar SMS</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          {cooldown > 0 ? (
+                            <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              <span>Reenviar código en {cooldown}s</span>
+                            </p>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleSendLinkSms}
+                              className="text-[11px] text-[#FF6B00] font-bold hover:underline cursor-pointer"
+                            >
+                              Reenviar código SMS
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {linkError && (
+                        <p className="text-xs text-red-600 font-semibold bg-red-50 p-2 rounded-lg border border-red-200">
+                          {linkError}
+                        </p>
+                      )}
+                    </div>
                   </div>
+                )}
+
+                <div className="flex items-center gap-2 p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-semibold text-emerald-900">
+                  <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Los clientes te contactarán por llamada o WhatsApp a este mismo número.</span>
                 </div>
-              )}
 
-              {/* WhatsApp = verified phone (the only contact method: calls or WhatsApp to this number) */}
-              <div className="flex items-center gap-2 p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-semibold text-emerald-900">
-                <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Los clientes te contactarán por llamada o WhatsApp a este mismo número.</span>
-              </div>
+                {registrationMethod === 'facebook' && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">
+                      Correo electrónico <span className="text-slate-400 font-normal lowercase">(opcional)</span>
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="ejemplo@correo.com"
+                      value={optionalEmail}
+                      onChange={(e) => setOptionalEmail(e.target.value)}
+                      className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-medium focus:bg-white focus:outline-hidden focus:border-[#FF6B00]"
+                    />
+                  </div>
+                )}
 
-              {/* Optional Email - only for Facebook authentication, removed for Phone Auth */}
-              {registrationMethod === 'facebook' && (
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                    Correo electrónico <span className="text-slate-400 font-normal lowercase">(opcional)</span>
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="ejemplo@correo.com"
-                    value={optionalEmail}
-                    onChange={(e) => setOptionalEmail(e.target.value)}
-                    className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium focus:bg-white focus:outline-hidden focus:border-orange-500"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Opcional. No es necesario para recibir llamadas de clientes.
-                  </p>
-                </div>
-              )}
-
-              <div className="pt-4 flex justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="py-3 px-4 border border-slate-300 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 cursor-pointer"
-                >
-                  Atrás
-                </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 px-6 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-4 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-extrabold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span>Continuar</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </form>
+            )}
+
+            {/* --- OFICIO PRINCIPAL --- */}
+            {WIZARD_STEPS[wizardIndex] === 'oficio' && (
+              <div className="space-y-6">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
+                  ¿Cuál es tu oficio principal?
+                </h1>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {trades.map((t) => {
+                    const isSelected = mainTrade === t.name;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setMainTrade(t.name)}
+                        className={`py-4 px-3 rounded-2xl text-sm font-bold border-2 transition-all cursor-pointer active:scale-[0.97] ${
+                          isSelected
+                            ? 'bg-[#0C2340] text-white border-[#0C2340] shadow-md'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-[#FF6B00]/50'
+                        }`}
+                      >
+                        {t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => goWizard(wizardIndex + 1, 'next')}
+                  className="w-full py-4 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-extrabold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Continuar</span>
+                  <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
-            </form>
-          </div>
-        )}
+            )}
 
-        {/* ========================================================================= */}
-        {/* STEP 3: INFORMACIÓN PROFESIONAL */}
-        {/* ========================================================================= */}
-        {step === 3 && (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-            <div className="space-y-1.5">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Oficio principal y trabajos que realizas
-              </h1>
-              <p className="text-slate-600 text-sm">
-                Los trabajos específicos que marcas son la variable principal que miran los clientes antes de contactarte.
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              {/* Main Trade */}
-              <div>
-                <label className="block text-[14px] font-bold uppercase text-slate-700 pb-0 mb-[15px]">
-                  Oficio principal
-                </label>
-                <select
-                  value={mainTrade}
-                  onChange={(e) => {
-                    setMainTrade(e.target.value);
-                  }}
-                  className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-xl text-[21px] font-bold focus:bg-white focus:outline-hidden focus:border-orange-500 cursor-pointer"
-                >
-                  {trades.map((t) => (
-                    <option key={t.id} value={t.name}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Years Experience */}
-              <div>
-                <div className="flex justify-between items-center mb-1 text-[17px]">
-                  <label className="block text-[14px] font-bold uppercase text-slate-700 mb-[15px]">
-                    Años de experiencia en el oficio
-                  </label>
-                  <span className="text-[17px] font-black text-orange-600 mb-[15px]">
-                    {yearsExperience} {yearsExperience === 1 ? 'año' : 'años'}
+            {/* --- AÑOS DE EXPERIENCIA --- */}
+            {WIZARD_STEPS[wizardIndex] === 'experiencia' && (
+              <div className="space-y-8">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
+                  ¿Cuántos años de experiencia tienes?
+                </h1>
+                <div className="text-center py-4">
+                  <span className="text-6xl font-black text-[#FF6B00]">{yearsExperience}</span>
+                  <span className="block text-lg font-bold text-slate-500 mt-1">
+                    {yearsExperience === 1 ? 'año' : 'años'}
                   </span>
                 </div>
                 <input
@@ -1483,39 +1493,26 @@ export const WorkerRegisterView: React.FC = () => {
                   max="40"
                   value={yearsExperience}
                   onChange={(e) => setYearsExperience(Number(e.target.value))}
-                  className="w-full accent-orange-600 cursor-pointer ml-[1px]"
+                  className="w-full accent-[#FF6B00] cursor-pointer h-2"
                 />
+                <button
+                  type="button"
+                  onClick={() => goWizard(wizardIndex + 1, 'next')}
+                  className="w-full py-4 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-extrabold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Continuar</span>
+                  <ArrowRight className="w-5 h-5" />
+                </button>
               </div>
+            )}
 
-              {/* Availability */}
-              <div>
-                <label className="block text-[14px] font-bold uppercase text-slate-700 mb-[15px]">
-                  Disponibilidad
-                </label>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {['Lunes a viernes', 'Fines de semana', 'Medio tiempo', 'Bajo cita'].map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => setDisponibilidad(opt)}
-                      className={`py-2.5 px-3 rounded-xl text-sm font-bold transition-all border cursor-pointer ${
-                        disponibilidad === opt
-                          ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-300 hover:border-orange-300'
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Secondary Trades (Chips) */}
-              <div>
-                <label className="block text-[14px] font-bold uppercase text-slate-700 bg-white mb-[15px]">
-                  Otros oficios que también dominas (Opcional)
-                </label>
-                <div className="flex flex-wrap gap-1.5 text-[17px] font-normal not-italic text-left pt-[15px] pb-[15px]">
+            {/* --- OTROS OFICIOS (OPCIONAL) --- */}
+            {WIZARD_STEPS[wizardIndex] === 'otros' && (
+              <div className="space-y-6">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
+                  ¿Qué otros oficios dominas?
+                </h1>
+                <div className="flex flex-wrap gap-2">
                   {trades
                     .filter((t) => t.name !== mainTrade)
                     .map((t) => {
@@ -1525,10 +1522,10 @@ export const WorkerRegisterView: React.FC = () => {
                           key={t.id}
                           type="button"
                           onClick={() => toggleSecondaryTrade(t.name)}
-                          className={`px-3 py-1.5 rounded-lg text-[14px] font-semibold border transition-all cursor-pointer ${
-                            isSelected 
-                              ? 'bg-slate-900 text-white border-slate-900' 
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 transition-all cursor-pointer active:scale-95 ${
+                            isSelected
+                              ? 'bg-[#0C2340] text-white border-[#0C2340]'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-[#FF6B00]/50'
                           }`}
                         >
                           {isSelected && '✓ '}
@@ -1537,175 +1534,156 @@ export const WorkerRegisterView: React.FC = () => {
                       );
                     })}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => goWizard(wizardIndex + 1, 'next')}
+                  className="w-full py-4 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-extrabold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Continuar</span>
+                  <ArrowRight className="w-5 h-5" />
+                </button>
               </div>
+            )}
 
-              {/* Suggested Services / Specific Works */}
-              <div
-                ref={servicesSectionRef}
-                tabIndex={-1}
-                className={`space-y-2 p-3.5 sm:p-4 rounded-2xl transition-all outline-hidden ${
-                  servicesError
-                    ? 'border-2 border-red-500 bg-red-50/50 ring-2 ring-red-200'
-                    : 'border border-slate-200/80 bg-slate-50/40'
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <label className="block text-[14px] font-bold uppercase text-slate-700">
-                    Trabajos que realizas
-                  </label>
-                  {services.length > 0 && (
-                    <span className="text-xs font-bold text-orange-600">
-                      {services.length} {services.length === 1 ? 'trabajo seleccionado' : 'trabajos seleccionados'}
-                    </span>
+            {/* --- DISPONIBILIDAD --- */}
+            {WIZARD_STEPS[wizardIndex] === 'disponibilidad' && (
+              <div className="space-y-6">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
+                  ¿Cuál es tu disponibilidad?
+                </h1>
+                <div className="grid grid-cols-2 gap-3">
+                  {['Lunes a viernes', 'Fines de semana', 'Medio tiempo', 'Bajo cita'].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setDisponibilidad(opt)}
+                      className={`py-5 px-3 rounded-2xl text-sm font-bold border-2 transition-all cursor-pointer active:scale-[0.97] ${
+                        disponibilidad === opt
+                          ? 'bg-[#0C2340] text-white border-[#0C2340] shadow-md'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-[#FF6B00]/50'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => goWizard(wizardIndex + 1, 'next')}
+                  className="w-full py-4 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-extrabold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Continuar</span>
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+
+            {/* --- TRABAJOS QUE REALIZAS --- */}
+            {WIZARD_STEPS[wizardIndex] === 'trabajos' && (
+              <div className="space-y-6">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
+                  ¿Qué trabajos específicos realizas?
+                </h1>
+
+                <div
+                  ref={servicesSectionRef}
+                  tabIndex={-1}
+                  className={`space-y-3 p-4 rounded-2xl transition-all outline-hidden ${
+                    servicesError
+                      ? 'border-2 border-red-500 bg-red-50/50 ring-2 ring-red-200'
+                      : ''
+                  }`}
+                >
+                  <div className="flex flex-wrap gap-2">
+                    {(tradeServiceSuggestions[mainTrade] || []).map((sugg) => {
+                      const isSelected = services.includes(sugg);
+                      return (
+                        <button
+                          key={sugg}
+                          type="button"
+                          onClick={() => toggleService(sugg)}
+                          className={`px-3.5 py-2 rounded-xl text-sm font-bold border-2 transition-all cursor-pointer active:scale-95 ${
+                            isSelected
+                              ? 'bg-[#FF6B00] text-white border-[#FF6B00] shadow-xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-[#FF6B00]/50'
+                          }`}
+                        >
+                          {isSelected ? '✓ ' : '+ '}
+                          {sugg}
+                        </button>
+                      );
+                    })}
+                    {services
+                      .filter((srv) => !(tradeServiceSuggestions[mainTrade] || []).includes(srv))
+                      .map((customSrv) => (
+                        <button
+                          key={customSrv}
+                          type="button"
+                          onClick={() => toggleService(customSrv)}
+                          className="px-3.5 py-2 rounded-xl text-sm font-bold border-2 transition-all cursor-pointer active:scale-95 bg-[#FF6B00] text-white border-[#FF6B00] shadow-xs flex items-center gap-1.5"
+                        >
+                          <span>✓ {customSrv}</span>
+                          <span className="text-orange-200 hover:text-white font-black text-xs">✕</span>
+                        </button>
+                      ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Otro trabajo específico"
+                      value={customServiceInput}
+                      onChange={(e) => setCustomServiceInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomService(e as any);
+                        }
+                      }}
+                      className="flex-1 p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium focus:bg-white focus:outline-hidden focus:border-[#FF6B00]"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => handleAddCustomService(e as any)}
+                      className="px-4 py-2 bg-[#0C2340] text-white text-sm font-bold rounded-xl hover:bg-[#153357] cursor-pointer shrink-0 active:scale-95 transition-all"
+                    >
+                      Agregar
+                    </button>
+                  </div>
+
+                  {servicesError && (
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-red-600">
+                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>{servicesError}</span>
+                    </div>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  Selecciona los trabajos específicos que sabes hacer para que los clientes te encuentren fácilmente:
-                </p>
 
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {(tradeServiceSuggestions[mainTrade] || []).map((sugg) => {
-                    const isSelected = services.includes(sugg);
-                    return (
-                      <button
-                        key={sugg}
-                        type="button"
-                        onClick={() => toggleService(sugg)}
-                        className={`px-3 py-1.5 rounded-xl text-[14px] font-bold border transition-all cursor-pointer ${
-                          isSelected 
-                            ? 'bg-orange-600 text-white border-orange-600 shadow-xs' 
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300'
-                        }`}
-                      >
-                        {isSelected ? '✓ ' : '+ '}
-                        {sugg}
-                      </button>
-                    );
-                  })}
-                  {/* Custom services added by user that are not in suggestions */}
-                  {services
-                    .filter((srv) => !(tradeServiceSuggestions[mainTrade] || []).includes(srv))
-                    .map((customSrv) => (
-                      <button
-                        key={customSrv}
-                        type="button"
-                        onClick={() => toggleService(customSrv)}
-                        className="px-3 py-1.5 rounded-xl text-[14px] font-bold border transition-all cursor-pointer bg-orange-600 text-white border-orange-600 shadow-xs flex items-center gap-1.5"
-                        title="Toca para quitar este trabajo"
-                      >
-                        <span>✓ {customSrv}</span>
-                        <span className="text-orange-200 hover:text-white font-black text-xs">✕</span>
-                      </button>
-                    ))}
-                </div>
-
-                {/* Custom service input */}
-                <div className="flex gap-2 pt-2">
-                  <input
-                    type="text"
-                    placeholder="Otro trabajo específico (ej. Colocación de cantera)"
-                    value={customServiceInput}
-                    onChange={(e) => setCustomServiceInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const trimmed = customServiceInput.trim();
-                        if (trimmed && !services.includes(trimmed)) {
-                          setServices((prev) => {
-                            const next = [...prev, trimmed];
-                            if (next.length >= 1) {
-                              setServicesError('');
-                            }
-                            return next;
-                          });
-                          setCustomServiceInput('');
-                        }
-                      }
-                    }}
-                    className="flex-1 p-2.5 bg-white border border-slate-300 rounded-xl text-[17px] font-medium focus:bg-white focus:outline-hidden focus:border-orange-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => handleAddCustomService(e as any)}
-                    className="px-3 py-2 bg-slate-900 text-white text-[14px] font-bold rounded-xl hover:bg-black cursor-pointer shrink-0"
-                  >
-                    Agregar
-                  </button>
-                </div>
-
-                {/* Error Message */}
-                {servicesError && (
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-red-600 pt-1">
-                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                    <span>{servicesError}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Brief presentation */}
-              <div>
-                <label className="block text-[14px] font-bold uppercase text-slate-700 mb-[15px]">
-                  Breve presentación de tu trabajo (Opcional)
-                </label>
                 <textarea
                   rows={2}
-                  placeholder="Ej. Cuento con herramienta propia y puntualidad en todos mis trabajos en Querétaro."
+                  placeholder="Breve presentación de tu trabajo (opcional)"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium focus:bg-white focus:outline-hidden focus:border-orange-500"
+                  className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-medium focus:bg-white focus:outline-hidden focus:border-[#FF6B00]"
                 />
-              </div>
 
-              <div className="pt-4 flex justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => setStep(2)}
-                  className="py-3 px-4 border border-slate-300 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 cursor-pointer"
+                  onClick={validateServicesAndContinue}
+                  className="w-full py-4 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-extrabold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  Atrás
-                </button>
-                <button
-                  type="button"
-                  onClick={validateStep3AndContinue}
-                  className="flex-1 py-3 px-6 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span className="text-[16px]">Continuar</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Continuar</span>
+                  <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* ========================================================================= */}
-        {/* STEP 4: ZONAS DE TRABAJO (INICIALIZADO VACÍO []) */}
-        {/* ========================================================================= */}
-        {step === 4 && (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-            <div className="space-y-1.5">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Zonas de trabajo en Querétaro
-              </h1>
-              <p className="text-slate-600 text-sm">
-                Indica en qué zonas o municipios realizas servicios para que los clientes locales te encuentren.
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              <div>
-                <div className="flex justify-between items-center mb-[15px] text-[16px]">
-                  <label className="block text-[14px] font-bold uppercase text-slate-700">
-                    Zonas y municipios de cobertura
-                  </label>
-                  <span className="text-[14px] font-bold text-orange-600">
-                    {selectedAreas.length} {selectedAreas.length === 1 ? 'zona seleccionada' : 'zonas seleccionadas'}
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-slate-500 mb-[12px]">
-                  Toca las zonas donde tienes disponibilidad de traslado para atender trabajos:
-                </p>
-
+            {/* --- ZONAS DE TRABAJO --- */}
+            {WIZARD_STEPS[wizardIndex] === 'zonas' && (
+              <div className="space-y-6">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
+                  ¿En qué zonas trabajas?
+                </h1>
                 <div className="flex flex-wrap gap-2">
                   {serviceAreas.map((a) => {
                     const isSelected = selectedAreas.includes(a.name);
@@ -1714,29 +1692,18 @@ export const WorkerRegisterView: React.FC = () => {
                         key={a.id}
                         type="button"
                         onClick={() => toggleServiceArea(a.name)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
-                          isSelected 
-                            ? 'bg-slate-900 text-white border-slate-900 shadow-xs ring-2 ring-slate-900/10' 
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        className={`px-3.5 py-2.5 rounded-xl text-sm font-bold border-2 transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-[#0C2340] text-white border-[#0C2340] shadow-xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-[#FF6B00]/50'
                         }`}
                       >
-                        <MapPin className="w-3.5 h-3.5 text-orange-500" />
+                        <MapPin className="w-3.5 h-3.5" />
                         <span>{a.name}</span>
-                        {isSelected && <span className="ml-1 text-[10px] text-emerald-400">✓</span>}
                       </button>
                     );
                   })}
                 </div>
-              </div>
-
-              <div className="pt-4 flex justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep(3)}
-                  className="py-3 px-4 border border-slate-300 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 cursor-pointer"
-                >
-                  Atrás
-                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -1745,93 +1712,59 @@ export const WorkerRegisterView: React.FC = () => {
                       return;
                     }
                     setGeneralError('');
-                    setStep(5);
+                    goWizard(wizardIndex + 1, 'next');
                   }}
-                  className="flex-1 py-3 px-6 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-4 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-extrabold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span>Continuar</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* ========================================================================= */}
-        {/* STEP 5: FOTOGRAFÍAS, REVISIÓN PREVIA Y PUBLICAR PERFIL */}
-        {/* ========================================================================= */}
-        {step === 5 && (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-            <div className="space-y-1.5">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Fotografías y revisión de tu perfil
-              </h1>
-              <p className="text-slate-600 text-sm">
-                Revisa los datos de tu perfil y añade fotografías de tus trabajos antes de publicarlo en Maestro Cerca.
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              {/* Profile Photo selector (Optional) */}
-              <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                <div className="relative w-16 h-16 rounded-2xl overflow-hidden shrink-0">
-                  <WorkerAvatar
-                    alt="Foto de perfil"
-                    allowPendingPreview={true}
-                    previewUrl={profilePreviewUrl || profilePhotoUrl}
-                    size="custom"
-                    className="w-16 h-16 rounded-2xl"
-                  />
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                    <Camera className="w-5 h-5 text-white drop-shadow-md" />
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-1">
-                  <span className="text-xs font-bold text-slate-900 block">Fotografía de perfil (Opcional)</span>
-                  <label className="inline-block px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-xs">
-                    <span>{profilePreviewUrl || profilePhotoUrl ? 'Cambiar foto' : 'Subir fotografía'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleProfilePhotoChange}
-                      className="hidden"
+            {/* --- FOTO DE PERFIL (avatar-first) --- */}
+            {WIZARD_STEPS[wizardIndex] === 'fotoPerfil' && (
+              <div className="space-y-6 text-center">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
+                  Agrega tu foto de perfil
+                </h1>
+                <div className="flex flex-col items-center gap-4 py-2">
+                  <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-full overflow-hidden shrink-0 border-4 border-slate-100 shadow-md">
+                    <WorkerAvatar
+                      alt="Foto de perfil"
+                      allowPendingPreview={true}
+                      previewUrl={profilePreviewUrl || profilePhotoUrl}
+                      size="custom"
+                      className="w-full h-full"
                     />
+                  </div>
+                  <label className="inline-flex items-center gap-2 px-6 py-3 bg-[#0C2340] hover:bg-[#153357] text-white text-sm font-bold rounded-2xl cursor-pointer transition-all active:scale-95 shadow-xs">
+                    <Camera className="w-4 h-4" />
+                    <span>{profilePreviewUrl || profilePhotoUrl ? 'Cambiar foto' : 'Subir fotografía'}</span>
+                    <input type="file" accept="image/*" onChange={handleProfilePhotoChange} className="hidden" />
                   </label>
-                  <p className="text-[11px] text-slate-500">
-                    Si no subes foto, se mostrará un avatar neutral de trabajador. Nunca usamos fotos de stock falsas.
-                  </p>
+                  <p className="text-xs text-slate-500">Opcional — puedes agregarla después.</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => goWizard(wizardIndex + 1, 'next')}
+                  className="w-full py-4 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-extrabold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Continuar</span>
+                  <ArrowRight className="w-5 h-5" />
+                </button>
               </div>
+            )}
 
-              {/* Work Gallery Upload (Optional) */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                <div>
-                  <h3 className="text-xs font-bold uppercase text-slate-900">Fotos de tus trabajos (Opcional)</h3>
-                  <p className="text-[11px] text-slate-500">
-                    Muestra proyectos y acabados que hayas realizado para generar más llamadas y confianza.
-                  </p>
-                </div>
-
-                <p className="text-[11px] text-slate-500 leading-relaxed italic bg-white p-2.5 rounded-xl border border-slate-200">
-                  Al subir fotografías confirmas que cuentas con autorización para compartirlas y que procurarás no incluir documentos, teléfonos, domicilios u otros datos personales de terceros.
-                </p>
-
-                <label className="p-4 border-2 border-dashed border-slate-300 hover:border-orange-500 rounded-2xl flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-white transition-colors">
-                  <Upload className="w-6 h-6 text-slate-400" />
-                  <span className="text-xs font-bold text-orange-600">Subir fotos de trabajos</span>
-                  <span className="text-[10px] text-slate-400">JPG, PNG hasta 5MB por foto</span>
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleWorkFilesUpload}
-                    className="hidden"
-                  />
-                </label>
+            {/* --- FOTOS DE TRABAJOS --- */}
+            {WIZARD_STEPS[wizardIndex] === 'fotosTrabajo' && (
+              <div className="space-y-6">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
+                  Fotos de tus trabajos
+                </h1>
 
                 {pendingWorkFiles.length > 0 && (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {pendingWorkFiles.map((item, idx) => (
                       <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-slate-200 border border-slate-300 group">
                         <img src={item.previewUrl} alt={item.title} className="w-full h-full object-cover" />
@@ -1846,55 +1779,95 @@ export const WorkerRegisterView: React.FC = () => {
                     ))}
                   </div>
                 )}
-              </div>
 
-              {/* Resumen previo de perfil */}
-              <div className="p-4 bg-orange-50/60 border border-orange-200 rounded-2xl space-y-2 text-xs">
-                <span className="font-extrabold uppercase text-orange-900 tracking-wider block">
-                  Resumen de tu nuevo perfil:
-                </span>
-                <div className="grid grid-cols-2 gap-2 text-slate-700 pt-1">
-                  <div><strong>Nombre:</strong> {firstName} {lastName}</div>
-                  <div><strong>Oficio:</strong> {mainTrade}</div>
-                  <div><strong>Experiencia:</strong> {yearsExperience} años</div>
-                  <div><strong>Celular:</strong> +52 {formatPhoneForDisplay(clean10Digits)}</div>
-                  <div className="col-span-2">
-                    <strong>Zonas ({selectedAreas.length}):</strong> {selectedAreas.join(', ')}
-                  </div>
-                </div>
-              </div>
+                <label className="p-6 border-2 border-dashed border-slate-300 hover:border-[#FF6B00] rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer bg-slate-50 transition-all active:scale-[0.99]">
+                  <Upload className="w-7 h-7 text-slate-400" />
+                  <span className="text-sm font-bold text-[#FF6B00]">Subir fotos de trabajos</span>
+                  <input type="file" multiple accept="image/*" onChange={handleWorkFilesUpload} className="hidden" />
+                </label>
 
-              {/* Submission CTA */}
-              <div className="pt-4 flex justify-between gap-3">
+                <p className="text-xs text-slate-500 text-center">
+                  Evita subir fotos de documentos o que afecten a terceros.
+                </p>
+
                 <button
                   type="button"
-                  disabled={isSubmitting || isUploading}
-                  onClick={() => setStep(4)}
-                  className="py-3.5 px-4 border border-slate-300 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => goWizard(wizardIndex + 1, 'next')}
+                  className="w-full py-4 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white font-extrabold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  Atrás
+                  <span>Continuar</span>
+                  <ArrowRight className="w-5 h-5" />
                 </button>
+              </div>
+            )}
+
+            {/* --- RESUMEN Y CREAR CUENTA --- */}
+            {WIZARD_STEPS[wizardIndex] === 'resumen' && (
+              <div className="space-y-6">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
+                  Revisa tu información
+                </h1>
+
+                <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 border-2 border-white shadow-xs">
+                    <WorkerAvatar
+                      alt="Foto de perfil"
+                      allowPendingPreview={true}
+                      previewUrl={profilePreviewUrl || profilePhotoUrl}
+                      size="custom"
+                      className="w-full h-full"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-base font-black text-[#0C2340]">{firstName} {lastName}</p>
+                    <p className="text-sm font-bold text-[#FF6B00]">{mainTrade} · {yearsExperience} {yearsExperience === 1 ? 'año' : 'años'}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5 text-sm">
+                  <div className="flex justify-between p-3 bg-slate-50 rounded-xl">
+                    <span className="font-bold text-slate-500">Celular</span>
+                    <span className="font-black text-slate-900">+52 {formatPhoneForDisplay(clean10Digits)}</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-slate-50 rounded-xl">
+                    <span className="font-bold text-slate-500">Disponibilidad</span>
+                    <span className="font-black text-slate-900">{disponibilidad}</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-slate-50 rounded-xl">
+                    <span className="font-bold text-slate-500">Trabajos</span>
+                    <span className="font-black text-slate-900 text-right">{services.length} seleccionados</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-slate-50 rounded-xl">
+                    <span className="font-bold text-slate-500">Zonas</span>
+                    <span className="font-black text-slate-900 text-right">{selectedAreas.join(', ')}</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-slate-50 rounded-xl">
+                    <span className="font-bold text-slate-500">Fotos de trabajo</span>
+                    <span className="font-black text-slate-900">{pendingWorkFiles.length}</span>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   id="submit-worker-profile-btn"
                   disabled={isSubmitting || isUploading}
                   onClick={handleFinishRegistration}
-                  className="flex-1 py-4 px-6 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white font-extrabold text-base rounded-2xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full py-5 px-6 bg-[#FF6B00] hover:bg-[#e65f00] disabled:bg-orange-300 active:scale-[0.98] text-white font-extrabold text-lg rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {isSubmitting || isUploading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>{uploadStatusText || 'Guardando perfil...'}</span>
+                      <span>{uploadStatusText || 'Creando cuenta...'}</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="w-5 h-5" />
-                      <span>Guardar mi perfil</span>
+                      <span>Crear cuenta</span>
                     </>
                   )}
                 </button>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -1911,7 +1884,7 @@ export const WorkerRegisterView: React.FC = () => {
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
                 ¡Registro completado!
               </span>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
                 ¡Bienvenido a Maestro Cerca, {createdWorker.firstName}!
               </h1>
               <p className="text-slate-600 text-sm max-w-md mx-auto leading-relaxed">
@@ -2015,7 +1988,7 @@ export const WorkerRegisterView: React.FC = () => {
                 type="button"
                 id="go-to-dashboard-btn"
                 onClick={() => navigateTo({ type: 'dashboard' })}
-                className="py-3.5 px-6 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                className="py-3.5 px-6 bg-[#FF6B00] hover:bg-[#e65f00] text-white font-bold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <User className="w-4 h-4" />
                 <span>Ir a mi panel de trabajador</span>
