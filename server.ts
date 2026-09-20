@@ -960,12 +960,101 @@ async function startServer() {
     | { success: true; deletedUid: string }
     | { success: false; status: number; step?: string; error: string; code?: string; details?: string };
 
+  // Every field ManyChat's WhatsApp flow ever writes for a worker's
+  // registration, plus the account-menu status fields â€” cleared on deletion
+  // so a deleted worker's personal data doesn't linger in ManyChat forever.
+  // ManyChat's API has no "delete subscriber" call (typical for messaging
+  // platforms, which must retain opt-in state), so the best available action
+  // is blanking every field that holds personal/work data.
+  const MANYCHAT_FIELDS_TO_CLEAR = [
+    "MC | Trabajador | Nombre",
+    "MC | Trabajadores | Apellido",
+    "MC | Trabajador | Oficio principal",
+    "MC | Trabajador | Servicios",
+    "MC | Trabajador | AÃ±os de experiencia",
+    "MC | Trabajador | Ciudad principal",
+    "MC | Trabajador | Zona de trabajo",
+    "MC | Trabajador | Disponibilidad",
+    "MC | Trabajador | Foto trabajo 1",
+    "MC | Trabajador | Foto trabajo 2",
+    "MC | Trabajador | Foto trabajo 3",
+    "MC | Trabajador | Foto trabajo 4",
+    "MC | Trabajador | Foto trabajo 5",
+    "cuenta_existe",
+    "status_nombre",
+    "status_oficio",
+    "status_ciudad",
+    "status_pausado",
+    "status_mensaje",
+    "status_slug",
+  ];
+
+  /**
+   * Best-effort cleanup of a deleted worker's data inside ManyChat itself.
+   * Never throws and never blocks/fails the real (Firebase-side) account
+   * deletion â€” this is a data-hygiene bonus, not something the deletion's
+   * success should depend on, since ManyChat's API/token might be down,
+   * misconfigured, or the subscriber might not exist there at all (e.g. for
+   * an account that was created purely via the website).
+   */
+  async function clearManyChatSubscriberData(manychatSubscriberId: string): Promise<void> {
+    const apiToken = process.env.MANYCHAT_API_TOKEN;
+    if (!apiToken || apiToken.trim() === "") {
+      console.warn("[ManyChat Cleanup] MANYCHAT_API_TOKEN not configured; skipping ManyChat-side data cleanup.");
+      return;
+    }
+
+    for (const fieldName of MANYCHAT_FIELDS_TO_CLEAR) {
+      try {
+        const resp = await fetch("https://api.manychat.com/fb/subscriber/setCustomFieldByName", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            subscriber_id: manychatSubscriberId,
+            field_name: fieldName,
+            field_value: "",
+          }),
+        });
+        if (!resp.ok) {
+          const bodyText = await resp.text().catch(() => "");
+          console.warn(`[ManyChat Cleanup] Failed to clear field "${fieldName}" for subscriber ${manychatSubscriberId}: ${resp.status} ${bodyText}`);
+        }
+      } catch (err: any) {
+        console.warn(`[ManyChat Cleanup] Error clearing field "${fieldName}" for subscriber ${manychatSubscriberId}:`, err?.message);
+      }
+    }
+
+    try {
+      await fetch("https://api.manychat.com/fb/subscriber/removeTagByName", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ subscriber_id: manychatSubscriberId, tag_name: "Trabajador" }),
+      });
+    } catch (err: any) {
+      console.warn(`[ManyChat Cleanup] Error removing tag for subscriber ${manychatSubscriberId}:`, err?.message);
+    }
+  }
+
   /**
    * Core deletion logic shared by the owner-facing /api/account endpoint and the
    * ManyChat phone-authenticated account-action endpoint. Callers are responsible
    * for authenticating/authorizing the caller and resolving targetUid first.
    */
   async function performAccountDeletion(targetUid: string): Promise<AccountDeletionResult> {
+    let manychatSubscriberId: string | null = null;
+    try {
+      const preDeleteSnap = await adminDb.doc(`maestros/${targetUid}`).get();
+      manychatSubscriberId = preDeleteSnap.exists ? (preDeleteSnap.data()?.manychatUserId || null) : null;
+    } catch {
+      // Non-critical: if this read fails, ManyChat cleanup is just skipped below.
+    }
+
     try {
       console.log(`[Account Deletion] Starting atomic deletion for UID: ${targetUid}`);
 
@@ -1138,6 +1227,11 @@ async function startServer() {
 
       // All steps passed and verified
       console.log(`[Account Deletion] UID ${targetUid} verified completely deleted across Auth, Firestore, and Storage.`);
+
+      if (manychatSubscriberId) {
+        await clearManyChatSubscriberData(manychatSubscriberId);
+      }
+
       return { success: true, deletedUid: targetUid };
     } catch (err: any) {
       console.error("[Account Deletion] Unexpected error:", err);
