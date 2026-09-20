@@ -71,7 +71,7 @@ async function moderateImageContent(
 
   try {
     const response = await genAI.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-2.0-flash",
       contents: [
         {
           inlineData: {
@@ -97,7 +97,7 @@ async function moderateImageContent(
     }
     return { safe: true };
   } catch (err: any) {
-    console.warn("[Gemini Moderation Warning]: Falló la clasificación, se permite la publicación (fail-open):", err?.message);
+    console.error("[Gemini Moderation ERROR]: Falló la clasificación, se permite la publicación sin filtro (fail-open):", err?.message);
     return { safe: true };
   }
 }
