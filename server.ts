@@ -354,6 +354,34 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
   // =========================================================================
+  // BASELINE SECURITY HEADERS + CORS (no new dependencies, zero cost)
+  // Restricts cross-origin API access to this app's own deployed origin
+  // (APP_URL, injected by AI Studio) and adds standard hardening headers.
+  // Skips CSP: the app serves its own React bundle inline via Vite/esbuild
+  // and a strict CSP would need careful auditing of every script/style
+  // source to avoid breaking the site — not something to guess at blind.
+  // =========================================================================
+  const allowedOrigin = process.env.APP_URL || "";
+  app.use((req: Request, res: Response, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+
+    const requestOrigin = req.headers.origin;
+    if (allowedOrigin && requestOrigin === allowedOrigin) {
+      res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+      res.setHeader("Vary", "Origin");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-api-key");
+    }
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
+
+  // =========================================================================
   // GENERIC IN-MEMORY SLIDING-WINDOW RATE LIMITER (zero cost, no external deps)
   // Keyed by client IP; each call site gets its own independent bucket.
   // =========================================================================
@@ -1819,6 +1847,10 @@ async function startServer() {
       const { leads } = req.body || {};
       if (!Array.isArray(leads)) {
         res.status(400).json({ success: false, error: "Formato de leads invÃ¡lido. Se espera un arreglo." });
+        return;
+      }
+      if (leads.length > 500) {
+        res.status(400).json({ success: false, error: "MÃ¡ximo 500 leads por solicitud. Divide el archivo en lotes mÃ¡s pequeÃ±os." });
         return;
       }
 
