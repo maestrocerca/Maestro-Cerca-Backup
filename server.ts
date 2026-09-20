@@ -783,6 +783,32 @@ async function startServer() {
         return;
       }
 
+      // Anti-resurrection guard: if this UID's current profile was created
+      // through a DIFFERENT channel (e.g. "phone"/"facebook" from the website)
+      // than ManyChat WhatsApp, never let a finalize-registration call â€” which
+      // may be replaying stale ManyChat custom-field data left over from a
+      // previous, since-deleted WhatsApp registration for this same phone
+      // number â€” overwrite it. This is what makes "register via WhatsApp,
+      // delete, re-register via the website with the same number" safe: the
+      // old WhatsApp conversation's cached data can never clobber the new
+      // profile, regardless of when ManyChat happens to (re)send it.
+      if (
+        existingSnap.exists &&
+        existingData.registrationMethod &&
+        existingData.registrationMethod !== "manychat_whatsapp"
+      ) {
+        console.warn(
+          `[ManyChat Finalize] Blocked overwrite of UID ${uid}: existing profile was created via '${existingData.registrationMethod}', not WhatsApp. Likely stale/replayed ManyChat data.`
+        );
+        res.status(409).json({
+          success: false,
+          error: "Este número ya tiene un perfil creado por otro medio (por ejemplo, la pÃ¡gina web). No se sobrescribiÃ³ para proteger tus datos.",
+          workerId: uid,
+          slug: existingData.slug,
+        });
+        return;
+      }
+
       const nowIso = new Date().toISOString();
       const slug = existingData.slug || (await generateUniqueSlugServer(nombreCompleto));
       const parsedYears = parseInt(experienciaRaw, 10);
