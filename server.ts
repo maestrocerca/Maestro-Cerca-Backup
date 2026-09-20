@@ -594,6 +594,7 @@ async function startServer() {
       // Required fields to actually publish a profile — until the bot has
       // collected all of these, ManyChat should keep talking, not finalize.
       const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
+      const apellido = typeof body.apellido === "string" ? body.apellido.trim() : "";
       const oficioPrincipal = typeof body.oficio_principal === "string" ? body.oficio_principal.trim() : "";
       const ciudad = typeof body.ciudad_principal === "string" ? body.ciudad_principal.trim() : "";
       const zonasRaw = typeof body.zonas_cobertura === "string" ? body.zonas_cobertura.trim() : "";
@@ -609,10 +610,20 @@ async function startServer() {
       const servicios = serviciosRaw ? serviciosRaw.split(/[,;\n/]+/).map((s) => s.trim()).filter(Boolean) : [];
 
       // The profile view reads firstName/lastName (not just the combined
-      // "nombre" string), so split it here the same way the CSV import path does.
-      const nombreParts = nombre.split(/\s+/).filter(Boolean);
-      const firstName = nombreParts[0] || "";
-      const lastName = nombreParts.slice(1).join(" ");
+      // "nombre" string). ManyChat now asks nombre and apellido as separate
+      // questions, so prefer that explicit split; fall back to guessing from
+      // a single combined "nombre" string the same way the CSV import path does.
+      let firstName: string;
+      let lastName: string;
+      if (apellido) {
+        firstName = nombre;
+        lastName = apellido;
+      } else {
+        const nombreParts = nombre.split(/\s+/).filter(Boolean);
+        firstName = nombreParts[0] || "";
+        lastName = nombreParts.slice(1).join(" ");
+      }
+      const nombreCompleto = [firstName, lastName].filter(Boolean).join(" ");
 
       if (!nombre || !oficioPrincipal || zonas.length === 0) {
         res.status(400).json({
@@ -650,7 +661,7 @@ async function startServer() {
       }
 
       const nowIso = new Date().toISOString();
-      const slug = existingData.slug || (await generateUniqueSlugServer(nombre));
+      const slug = existingData.slug || (await generateUniqueSlugServer(nombreCompleto));
       const parsedYears = parseInt(experienciaRaw, 10);
 
       // 2. Optional work-sample photo: same automated moderation gate as the
@@ -697,7 +708,7 @@ async function startServer() {
         id: uid,
         userId: uid,
         slug,
-        nombre,
+        nombre: nombreCompleto,
         firstName,
         lastName,
         oficio: oficioPrincipal,
