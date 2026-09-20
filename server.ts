@@ -982,12 +982,12 @@ async function startServer() {
   // ManyChat's API has no "delete subscriber" call (typical for messaging
   // platforms, which must retain opt-in state), so the best available action
   // is blanking every field that holds personal/work data.
-  const MANYCHAT_FIELDS_TO_CLEAR = [
+  const MANYCHAT_TEXT_FIELDS_TO_CLEAR = [
     "MC | Trabajador | Nombre",
     "MC | Trabajadores | Apellido",
     "MC | Trabajador | Oficio principal",
     "MC | Trabajador | Servicios",
-    "MC | Trabajador | AÃ±os de experiencia",
+    "MC | Trabajador | Años de experiencia",
     "MC | Trabajador | Ciudad principal",
     "MC | Trabajador | Zona de trabajo",
     "MC | Trabajador | Disponibilidad",
@@ -996,14 +996,16 @@ async function startServer() {
     "MC | Trabajador | Foto trabajo 3",
     "MC | Trabajador | Foto trabajo 4",
     "MC | Trabajador | Foto trabajo 5",
-    "cuenta_existe",
     "status_nombre",
     "status_oficio",
     "status_ciudad",
-    "status_pausado",
     "status_mensaje",
     "status_slug",
   ];
+
+  // ManyChat's API rejects "" for a boolean custom field ("Value for boolean
+  // custom field should be boolean") â€” these need an actual false, not text.
+  const MANYCHAT_BOOLEAN_FIELDS_TO_CLEAR = ["cuenta_existe", "status_pausado"];
 
   /**
    * Best-effort cleanup of a deleted worker's data inside ManyChat itself.
@@ -1020,7 +1022,12 @@ async function startServer() {
       return;
     }
 
-    for (const fieldName of MANYCHAT_FIELDS_TO_CLEAR) {
+    const fieldsToClear: Array<{ name: string; value: string | boolean | null }> = [
+      ...MANYCHAT_TEXT_FIELDS_TO_CLEAR.map((name) => ({ name, value: null })),
+      ...MANYCHAT_BOOLEAN_FIELDS_TO_CLEAR.map((name) => ({ name, value: false })),
+    ];
+
+    for (const field of fieldsToClear) {
       try {
         const resp = await fetch("https://api.manychat.com/fb/subscriber/setCustomFieldByName", {
           method: "POST",
@@ -1030,16 +1037,16 @@ async function startServer() {
           },
           body: JSON.stringify({
             subscriber_id: manychatSubscriberId,
-            field_name: fieldName,
-            field_value: "",
+            field_name: field.name,
+            field_value: field.value,
           }),
         });
         if (!resp.ok) {
           const bodyText = await resp.text().catch(() => "");
-          console.warn(`[ManyChat Cleanup] Failed to clear field "${fieldName}" for subscriber ${manychatSubscriberId}: ${resp.status} ${bodyText}`);
+          console.warn(`[ManyChat Cleanup] Failed to clear field "${field.name}" for subscriber ${manychatSubscriberId}: ${resp.status} ${bodyText}`);
         }
       } catch (err: any) {
-        console.warn(`[ManyChat Cleanup] Error clearing field "${fieldName}" for subscriber ${manychatSubscriberId}:`, err?.message);
+        console.warn(`[ManyChat Cleanup] Error clearing field "${field.name}" for subscriber ${manychatSubscriberId}:`, err?.message);
       }
     }
 
