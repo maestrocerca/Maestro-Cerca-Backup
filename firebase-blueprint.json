@@ -111,7 +111,7 @@
       "schema": "SolicitudContacto",
       "description": "Lead and direct contact request records"
     },
-    "/preWorkers/{preWorkerId}": {
+    "/trabajadores_pendientes/{preWorkerId}": {
       "schema": "PreWorker",
       "description": "Preliminary WhatsApp worker profiles from ManyChat awaiting authentication claiming"
     },
@@ -154,7 +154,7 @@
         "fechaRegistro": { "type": "string" }
       }
     },
-    "preWorkers": {
+    "trabajadores_pendientes": {
       "description": "Preliminary ManyChat WhatsApp worker leads pending claiming",
       "fields": {
         "id": { "type": "string" },

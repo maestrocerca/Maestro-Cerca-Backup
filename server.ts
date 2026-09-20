@@ -506,7 +506,7 @@ async function startServer() {
             if (maestroData.statusPerfil === "Aprobado" || maestroData.aprobado === true) {
               console.log(`[ManyChat Cancellation] Worker ${maestroDoc.id} is already approved on platform. Preserving active profile.`);
               // Only mark preWorker as cancelled
-              await adminDb.collection("preWorkers").doc(preWorkerKey).set({
+              await adminDb.collection("trabajadores_pendientes").doc(preWorkerKey).set({
                 status: "cancelled",
                 cancelledAt: now,
                 updatedAt: now,
@@ -522,7 +522,7 @@ async function startServer() {
         }
 
         // Mark preWorker as cancelled
-        await adminDb.collection("preWorkers").doc(preWorkerKey).set({
+        await adminDb.collection("trabajadores_pendientes").doc(preWorkerKey).set({
           status: "cancelled",
           cancelledAt: now,
           updatedAt: now,
@@ -585,8 +585,8 @@ async function startServer() {
           ? String(body.disponibilidad).trim()
           : "";
 
-      // Canonical persistence: collection 'preWorkers' using adminDb
-      const preDocRef = adminDb.collection("preWorkers").doc(preWorkerKey);
+      // Canonical persistence: collection 'trabajadores_pendientes' using adminDb
+      const preDocRef = adminDb.collection("trabajadores_pendientes").doc(preWorkerKey);
       const preSnap = await preDocRef.get();
 
       const parsedYears = parseInt(experiencia, 10);
@@ -898,7 +898,7 @@ async function startServer() {
       //    was also used during the conversation) so it's not left dangling.
       try {
         const preWorkerId = `pre_${digitsOnly}`;
-        await adminDb.collection("preWorkers").doc(preWorkerId).set(
+        await adminDb.collection("trabajadores_pendientes").doc(preWorkerId).set(
           { status: "claimed", claimedByUid: uid, claimedAt: nowIso, updatedAt: nowIso },
           { merge: true }
         );
@@ -986,7 +986,7 @@ async function startServer() {
 
         // Clean preWorkers where claimedByUid == targetUid
         const preWorkersSnap = await adminDb
-          .collection("preWorkers")
+          .collection("trabajadores_pendientes")
           .where("claimedByUid", "==", targetUid)
           .get();
         for (const preDoc of preWorkersSnap.docs) {
@@ -1395,7 +1395,7 @@ async function startServer() {
 
         // Revert preWorker claim if any was claimed by this provisional user (do NOT delete original preWorker)
         const preSnap = await adminDb
-          .collection("preWorkers")
+          .collection("trabajadores_pendientes")
           .where("claimedByUid", "==", uid)
           .get();
         for (const doc of preSnap.docs) {
@@ -1967,6 +1967,59 @@ async function startServer() {
   });
 
   // =========================================================================
+  // ONE-TIME ADMIN MIGRATION: trades -> catalogo_oficios, serviceAreas -> catalogo_zonas
+  // POST /api/admin/migrate-catalogs
+  // Idempotent (uses .set(), safe to re-run). Copies documents only â€” does not
+  // delete the old collections, so the site keeps working on either name until
+  // every code reference has cut over and this has been confirmed manually.
+  // Remove this endpoint once the migration is done and confirmed.
+  // =========================================================================
+  app.post("/api/admin/migrate-catalogs", async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization || "";
+      if (!authHeader.startsWith("Bearer ")) {
+        res.status(401).json({ success: false, error: "No autorizado." });
+        return;
+      }
+      const token = authHeader.substring(7).trim();
+      let decodedToken: any;
+      try {
+        decodedToken = await adminAuth.verifyIdToken(token);
+      } catch {
+        res.status(401).json({ success: false, error: "Token invÃ¡lido o expirado." });
+        return;
+      }
+      if (decodedToken.admin !== true) {
+        res.status(403).json({ success: false, error: "Acceso denegado. Permisos de administrador requeridos." });
+        return;
+      }
+
+      async function copyCollection(fromName: string, toName: string): Promise<number> {
+        const snap = await adminDb.collection(fromName).get();
+        let count = 0;
+        for (const docSnap of snap.docs) {
+          await adminDb.collection(toName).doc(docSnap.id).set(docSnap.data());
+          count++;
+        }
+        return count;
+      }
+
+      const oficiosCopied = await copyCollection("trades", "catalogo_oficios");
+      const zonasCopied = await copyCollection("serviceAreas", "catalogo_zonas");
+
+      res.status(200).json({
+        success: true,
+        oficiosCopied,
+        zonasCopied,
+        message: `Copiados ${oficiosCopied} oficios y ${zonasCopied} zonas a las colecciones nuevas.`,
+      });
+    } catch (err: any) {
+      console.error("[Migrate Catalogs] Error:", err);
+      res.status(500).json({ success: false, error: err?.message || "Error al migrar catÃ¡logos." });
+    }
+  });
+
+  // =========================================================================
   // ADMIN IMPORT LEADS ENDPOINT (ManyChat Leads Importer)
   // POST /api/admin/import-leads
   // =========================================================================
@@ -2125,7 +2178,7 @@ async function startServer() {
           // Also save in preWorkers for instant claiming if worker uses phone auth
           try {
             const preWorkerKey = `pre_${last10}`;
-            await adminDb.collection("preWorkers").doc(preWorkerKey).set({
+            await adminDb.collection("trabajadores_pendientes").doc(preWorkerKey).set({
               id: preWorkerKey,
               phoneNumber: e164,
               phone: last10,

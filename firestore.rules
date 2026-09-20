@@ -137,7 +137,7 @@ service cloud.firestore {
     //   can claim the preWorker, setting status to 'claimed' and claimedByUid.
     // - Anti-hijack: Once claimed, no other UID can claim or overwrite the preWorker.
     // =========================================================================
-    match /preWorkers/{preWorkerId} {
+    match /trabajadores_pendientes/{preWorkerId} {
       // Read access: Admin can list/get all; authenticated users can only get if they claimed it or match verified phone
       allow list: if isAdmin();
       allow get: if isAdmin() || (
@@ -202,6 +202,19 @@ service cloud.firestore {
     }
 
     match /serviceAreas/{areaId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Renamed catalogs (trades -> catalogo_oficios, serviceAreas -> catalogo_zonas).
+    // Old collections above stay active temporarily until the one-time migration
+    // is confirmed and every code reference has cut over.
+    match /catalogo_oficios/{tradeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /catalogo_zonas/{areaId} {
       allow read: if true;
       allow write: if isAdmin();
     }

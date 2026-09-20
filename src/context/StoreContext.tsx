@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   User as FirebaseUser,
   onAuthStateChanged,
@@ -535,7 +535,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             workerName: s.maestroNombre || 'Maestro',
             type: (s.tipo as any) || 'whatsapp',
             trade: s.oficio || '',
-            area: 'Zibatá',
+            area: 'ZibatÃ¡',
             timestamp: s.fecha || new Date().toISOString(),
           }));
           setContactEvents(synthesizedEvents);
@@ -861,7 +861,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const { digitsOnly, waMeFormat } = sanitizeMexicanPhone(rawPhone);
 
     if (!rawPhone || !digitsOnly || digitsOnly.length < 10) {
-      showToast('Este trabajador no tiene un número de contacto disponible por el momento.');
+      showToast('Este trabajador no tiene un nÃºmero de contacto disponible por el momento.');
       return;
     }
 
@@ -923,7 +923,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const { waMeFormat, digitsOnly } = sanitizeMexicanPhone(rawPhone);
 
     if (!rawPhone || !digitsOnly || digitsOnly.length < 10) {
-      showToast('Este trabajador no tiene un número de contacto disponible por el momento.');
+      showToast('Este trabajador no tiene un nÃºmero de contacto disponible por el momento.');
       return;
     }
 
@@ -1006,21 +1006,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (err: any) {
       console.warn('Firebase Phone Auth send error:', err.code, err.message);
       
-      let userFriendlyError = 'No pudimos enviar el código SMS. Intenta nuevamente.';
+      let userFriendlyError = 'No pudimos enviar el cÃ³digo SMS. Intenta nuevamente.';
       if (err.code === 'auth/invalid-phone-number') {
-        userFriendlyError = 'Número inválido. Asegúrate de ingresar 10 dígitos celulares.';
+        userFriendlyError = 'NÃºmero invÃ¡lido. AsegÃºrate de ingresar 10 dÃ­gitos celulares.';
       } else if (err.code === 'auth/missing-phone-number') {
-        userFriendlyError = 'Por favor ingresa tu número de celular.';
+        userFriendlyError = 'Por favor ingresa tu nÃºmero de celular.';
       } else if (err.code === 'auth/quota-exceeded') {
-        userFriendlyError = 'Se ha superado el límite de SMS por hoy. Intenta más tarde.';
+        userFriendlyError = 'Se ha superado el lÃ­mite de SMS por hoy. Intenta mÃ¡s tarde.';
       } else if (err.code === 'auth/too-many-requests') {
-        userFriendlyError = 'Demasiados intentos. Intenta nuevamente más tarde.';
+        userFriendlyError = 'Demasiados intentos. Intenta nuevamente mÃ¡s tarde.';
       } else if (err.code === 'auth/captcha-check-failed') {
-        userFriendlyError = 'Error de verificación reCAPTCHA. Recarga la página e intenta de nuevo.';
+        userFriendlyError = 'Error de verificaciÃ³n reCAPTCHA. Recarga la pÃ¡gina e intenta de nuevo.';
       } else if (err.code === 'auth/network-request-failed') {
-        userFriendlyError = 'Error de conexión. Revisa tu acceso a internet.';
+        userFriendlyError = 'Error de conexiÃ³n. Revisa tu acceso a internet.';
       } else if (err.code === 'auth/operation-not-allowed') {
-        userFriendlyError = 'El servicio de verificación telefónica no está disponible en este momento. Intenta más tarde.';
+        userFriendlyError = 'El servicio de verificaciÃ³n telefÃ³nica no estÃ¡ disponible en este momento. Intenta mÃ¡s tarde.';
       }
 
       return { success: false, error: userFriendlyError };
@@ -1033,7 +1033,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   ): Promise<{ success: boolean; user?: FirebaseUser; hasExistingProfile?: boolean; worker?: Worker; error?: string }> => {
     const cleanCode = verificationCode.trim().replace(/\D/g, '');
     if (!cleanCode || cleanCode.length < 6) {
-      return { success: false, error: 'Ingresa el código completo de 6 dígitos que recibiste por SMS.' };
+      return { success: false, error: 'Ingresa el cÃ³digo completo de 6 dÃ­gitos que recibiste por SMS.' };
     }
 
     try {
@@ -1069,18 +1069,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           ) {
             return {
               success: false,
-              error: 'Este número celular ya está vinculado a otra cuenta',
+              error: 'Este nÃºmero celular ya estÃ¡ vinculado a otra cuenta',
             };
           }
           if (linkErr?.code === 'auth/provider-already-linked') {
-            return { success: false, error: 'Este número celular ya se encuentra vinculado a tu perfil.' };
+            return { success: false, error: 'Este nÃºmero celular ya se encuentra vinculado a tu perfil.' };
           }
           if (linkErr?.code === 'auth/invalid-verification-code') {
-            return { success: false, error: 'Código incorrecto. Verifica los 6 dígitos recibidos por SMS.' };
+            return { success: false, error: 'CÃ³digo incorrecto. Verifica los 6 dÃ­gitos recibidos por SMS.' };
           }
           return {
             success: false,
-            error: linkErr?.message || 'Error al vincular el número celular a tu cuenta.',
+            error: linkErr?.message || 'Error al vincular el nÃºmero celular a tu cuenta.',
           };
         }
       } else {
@@ -1125,13 +1125,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const preWorkerId = `pre_${authPhoneDigits}`;
 
         try {
-          let preWorkerDocSnap = await getDoc(doc(db, 'preWorkers', preWorkerId));
+          let preWorkerDocSnap = await getDoc(doc(db, 'trabajadores_pendientes', preWorkerId));
           let preWorkerData = preWorkerDocSnap.exists() ? (preWorkerDocSnap.data() as any) : null;
 
           // Secondary fallback: query by phoneNumber field
           if (!preWorkerData) {
             const preQuery = query(
-              collection(db, 'preWorkers'),
+              collection(db, 'trabajadores_pendientes'),
               where('phoneNumber', '==', authE164)
             );
             const preQuerySnap = await getDocs(preQuery);
@@ -1232,7 +1232,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
               // 3. Mark preWorker as claimed, store claimedByUid and claimedAt
               try {
-                await updateDoc(doc(db, 'preWorkers', preWorkerDocSnap.id), {
+                await updateDoc(doc(db, 'trabajadores_pendientes', preWorkerDocSnap.id), {
                   status: 'claimed',
                   claimedByUid: user.uid,
                   claimedAt: new Date().toISOString(),
@@ -1284,19 +1284,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (err: any) {
       console.warn('Firebase Phone Auth confirm error:', err.code, err.message);
 
-      let userFriendlyError = 'Código incorrecto. Revisa el SMS e intenta de nuevo.';
+      let userFriendlyError = 'CÃ³digo incorrecto. Revisa el SMS e intenta de nuevo.';
       if (
         err.code === 'auth/credential-already-in-use' ||
         err.code === 'auth/account-exists-with-different-credential' ||
         String(err?.message || '').includes('credential-already-in-use')
       ) {
-        userFriendlyError = 'Este número celular ya está vinculado a otra cuenta';
+        userFriendlyError = 'Este nÃºmero celular ya estÃ¡ vinculado a otra cuenta';
       } else if (err.code === 'auth/invalid-verification-code') {
-        userFriendlyError = 'Código incorrecto. Verifica los 6 dígitos recibidos.';
+        userFriendlyError = 'CÃ³digo incorrecto. Verifica los 6 dÃ­gitos recibidos.';
       } else if (err.code === 'auth/code-expired') {
-        userFriendlyError = 'Código vencido. Por favor solicita un nuevo código por SMS.';
+        userFriendlyError = 'CÃ³digo vencido. Por favor solicita un nuevo cÃ³digo por SMS.';
       } else if (err.code === 'auth/network-request-failed') {
-        userFriendlyError = 'Error de conexión. Revisa tu acceso a internet.';
+        userFriendlyError = 'Error de conexiÃ³n. Revisa tu acceso a internet.';
       }
 
       return { success: false, error: userFriendlyError };
@@ -1308,7 +1308,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!auth.currentUser) {
       return { 
         success: false, 
-        error: 'Debes iniciar sesión con tu cuenta o verificar tu número celular para crear tu perfil.' 
+        error: 'Debes iniciar sesiÃ³n con tu cuenta o verificar tu nÃºmero celular para crear tu perfil.' 
       };
     }
 
@@ -1336,7 +1336,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const { digitsOnly, waMeFormat, e164WithPlus } = sanitizeMexicanPhone(verifiedPhone);
     const national10 = digitsOnly.slice(-10);
     if (!national10 || national10.length !== 10) {
-      return { success: false, error: 'El teléfono celular debe contener exactamente 10 dígitos.' };
+      return { success: false, error: 'El telÃ©fono celular debe contener exactamente 10 dÃ­gitos.' };
     }
 
     // Resolve WhatsApp number: only set if explicitly indicated or provided
@@ -1361,7 +1361,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const cleanServiceAreas = (data.serviceAreas || []).map(sanitizeText).filter((a) => a.length > 0);
     if (cleanServiceAreas.length === 0) {
-      return { success: false, error: 'Debes seleccionar al menos una zona de cobertura en Querétaro.' };
+      return { success: false, error: 'Debes seleccionar al menos una zona de cobertura en QuerÃ©taro.' };
     }
 
     const privacyAccepted = Boolean(data.privacyNoticeAccepted || (data as any).privacyAccepted);
@@ -1370,7 +1370,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { success: false, error: 'Debes aceptar el Aviso de Privacidad para continuar.' };
     }
     if (!termsAccepted) {
-      return { success: false, error: 'Debes aceptar los Términos y Condiciones para continuar.' };
+      return { success: false, error: 'Debes aceptar los TÃ©rminos y Condiciones para continuar.' };
     }
 
     const isFacebookUser = Boolean(
@@ -1515,7 +1515,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('Save error:', firestoreErr);
       return {
         success: false,
-        error: 'Ocurrió un error al guardar los cambios. Intenta de nuevo.',
+        error: 'OcurriÃ³ un error al guardar los cambios. Intenta de nuevo.',
       };
     }
   }, []);
@@ -1526,7 +1526,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loginAdmin = useCallback(async (email: string, password: string): Promise<AuthResponse> => {
     const clean = email.trim().toLowerCase();
     if (!clean || !password) {
-      return { success: false, error: 'Por favor ingresa tu correo y contraseña administrativa.' };
+      return { success: false, error: 'Por favor ingresa tu correo y contraseÃ±a administrativa.' };
     }
 
     try {
@@ -1534,11 +1534,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { success: true };
     } catch (authErr: any) {
       console.warn('Firebase admin signIn error:', authErr.code, authErr.message);
-      let message = 'Credenciales administrativas no válidas.';
+      let message = 'Credenciales administrativas no vÃ¡lidas.';
       if (authErr.code === 'auth/wrong-password' || authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential') {
-        message = 'Correo o contraseña administrativa incorrectos.';
+        message = 'Correo o contraseÃ±a administrativa incorrectos.';
       } else if (authErr.code === 'auth/network-request-failed') {
-        message = 'Error de conexión con el servidor. Revisa tu acceso a internet.';
+        message = 'Error de conexiÃ³n con el servidor. Revisa tu acceso a internet.';
       }
       return { success: false, error: message };
     }
@@ -1552,11 +1552,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { success: true };
     } catch (err: any) {
       console.warn('Google sign-in error:', err);
-      let message = 'No se pudo completar el inicio de sesión con Google.';
+      let message = 'No se pudo completar el inicio de sesiÃ³n con Google.';
       if (err.code === 'auth/popup-closed-by-user') {
-        message = 'Se cerró la ventana emergente de Google.';
+        message = 'Se cerrÃ³ la ventana emergente de Google.';
       } else if (err.code === 'auth/popup-blocked') {
-        message = 'El navegador bloqueó la ventana emergente. Por favor permítela e intenta de nuevo.';
+        message = 'El navegador bloqueÃ³ la ventana emergente. Por favor permÃ­tela e intenta de nuevo.';
       }
       return { success: false, error: message };
     }
@@ -1632,7 +1632,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await signOut(auth).catch(() => {});
         return {
           success: false,
-          error: 'No encontramos una cuenta de trabajador vinculada a este Facebook. Por favor regístrate primero.',
+          error: 'No encontramos una cuenta de trabajador vinculada a este Facebook. Por favor regÃ­strate primero.',
         };
       }
 
@@ -1679,19 +1679,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
 
       // Specific error code mappings
-      let message = 'No se pudo completar el inicio de sesión con Facebook.';
+      let message = 'No se pudo completar el inicio de sesiÃ³n con Facebook.';
       if (err.code === 'auth/operation-not-allowed') {
-        message = 'El inicio de sesión con Facebook no está habilitado en Firebase Authentication (requiere activar el proveedor en la consola y agregar el App ID y App Secret de Meta).';
+        message = 'El inicio de sesiÃ³n con Facebook no estÃ¡ habilitado en Firebase Authentication (requiere activar el proveedor en la consola y agregar el App ID y App Secret de Meta).';
       } else if (err.code === 'auth/unauthorized-domain') {
-        message = 'El dominio actual no está en la lista de Dominios Autorizados de Firebase Authentication.';
+        message = 'El dominio actual no estÃ¡ en la lista de Dominios Autorizados de Firebase Authentication.';
       } else if (err.code === 'auth/popup-blocked') {
-        message = 'El navegador bloqueó la ventana emergente de Facebook. Por favor permite las ventanas emergentes en tu navegador e intenta de nuevo.';
+        message = 'El navegador bloqueÃ³ la ventana emergente de Facebook. Por favor permite las ventanas emergentes en tu navegador e intenta de nuevo.';
       } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-        return { success: false, error: 'La ventana de inicio de sesión con Facebook se cerró antes de completar la autenticación.' };
+        return { success: false, error: 'La ventana de inicio de sesiÃ³n con Facebook se cerrÃ³ antes de completar la autenticaciÃ³n.' };
       } else if (err.code === 'auth/account-exists-with-different-credential') {
-        message = 'Ya existe una cuenta asociada a este correo con otro método de acceso (por ejemplo, celular o Google). Por favor inicia sesión con tu método original y vincula Facebook desde tu perfil.';
+        message = 'Ya existe una cuenta asociada a este correo con otro mÃ©todo de acceso (por ejemplo, celular o Google). Por favor inicia sesiÃ³n con tu mÃ©todo original y vincula Facebook desde tu perfil.';
       } else if (err.code === 'auth/credential-already-in-use') {
-        message = 'Esta cuenta de Facebook ya está vinculada a otra cuenta de Maestro Cerca.';
+        message = 'Esta cuenta de Facebook ya estÃ¡ vinculada a otra cuenta de Maestro Cerca.';
       } else if (err.message) {
         message = err.message;
       }
@@ -1767,11 +1767,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('[Facebook Worker Registration Error]:', err);
       let message = 'No se pudo completar el registro con Facebook.';
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-        return { success: false, error: 'La ventana de registro con Facebook se cerró antes de completar.' };
+        return { success: false, error: 'La ventana de registro con Facebook se cerrÃ³ antes de completar.' };
       } else if (err.code === 'auth/account-exists-with-different-credential') {
-        message = 'Ya existe una cuenta asociada a este correo. Inicia sesión con tu teléfono o método original.';
+        message = 'Ya existe una cuenta asociada a este correo. Inicia sesiÃ³n con tu telÃ©fono o mÃ©todo original.';
       } else if (err.code === 'auth/popup-blocked') {
-        message = 'El navegador bloqueó la ventana emergente. Por favor permite las ventanas emergentes e intenta de nuevo.';
+        message = 'El navegador bloqueÃ³ la ventana emergente. Por favor permite las ventanas emergentes e intenta de nuevo.';
       } else if (err.message) {
         message = err.message;
       }
@@ -1787,7 +1787,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // 1. Link Facebook Account via linkWithPopup
   const linkFacebookAccount = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (!auth.currentUser) {
-      return { success: false, error: 'No hay una sesión activa para vincular la cuenta.' };
+      return { success: false, error: 'No hay una sesiÃ³n activa para vincular la cuenta.' };
     }
 
     try {
@@ -1808,7 +1808,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
 
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-        return { success: false, error: 'La ventana de Facebook se cerró antes de completar la vinculación.' };
+        return { success: false, error: 'La ventana de Facebook se cerrÃ³ antes de completar la vinculaciÃ³n.' };
       }
 
       if (
@@ -1817,21 +1817,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ) {
         return {
           success: false,
-          error: 'Este método de acceso ya está vinculado a otra cuenta de Maestro Cerca. Para proteger tus datos, no podemos vincularlo automáticamente. Inicia sesión con esa cuenta o contacta a Maestro Cerca para resolverlo.'
+          error: 'Este mÃ©todo de acceso ya estÃ¡ vinculado a otra cuenta de Maestro Cerca. Para proteger tus datos, no podemos vincularlo automÃ¡ticamente. Inicia sesiÃ³n con esa cuenta o contacta a Maestro Cerca para resolverlo.'
         };
       }
 
       if (err.code === 'auth/operation-not-allowed') {
         return {
           success: false,
-          error: 'El inicio de sesión con Facebook no está habilitado en Firebase Authentication (requiere activar el proveedor en la consola y agregar el App ID y App Secret de Meta).'
+          error: 'El inicio de sesiÃ³n con Facebook no estÃ¡ habilitado en Firebase Authentication (requiere activar el proveedor en la consola y agregar el App ID y App Secret de Meta).'
         };
       }
 
       if (err.code === 'auth/unauthorized-domain') {
         return {
           success: false,
-          error: 'El dominio actual no está autorizado en la consola de Firebase Authentication.'
+          error: 'El dominio actual no estÃ¡ autorizado en la consola de Firebase Authentication.'
         };
       }
 
@@ -1840,7 +1840,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       if (err.code === 'auth/popup-blocked') {
-        return { success: false, error: 'El navegador bloqueó la ventana emergente de Facebook. Por favor permite las ventanas emergentes e intenta de nuevo.' };
+        return { success: false, error: 'El navegador bloqueÃ³ la ventana emergente de Facebook. Por favor permite las ventanas emergentes e intenta de nuevo.' };
       }
 
       return { 
@@ -1856,7 +1856,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     containerId: string
   ): Promise<{ success: boolean; confirmationResult?: ConfirmationResult; error?: string }> => {
     if (!auth.currentUser) {
-      return { success: false, error: 'No hay una sesión activa para vincular el número de celular.' };
+      return { success: false, error: 'No hay una sesiÃ³n activa para vincular el nÃºmero de celular.' };
     }
     return sendPhoneVerificationCode(phoneNumberE164, containerId);
   }, [sendPhoneVerificationCode]);
@@ -1867,16 +1867,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     verificationCode: string
   ): Promise<{ success: boolean; error?: string }> => {
     if (!auth.currentUser) {
-      return { success: false, error: 'No hay una sesión activa para vincular el número celular.' };
+      return { success: false, error: 'No hay una sesiÃ³n activa para vincular el nÃºmero celular.' };
     }
 
     if (isAdmin || isUserAdmin(auth.currentUser, userClaims)) {
-      return { success: false, error: 'Acción no permitida para cuentas administrativas.' };
+      return { success: false, error: 'AcciÃ³n no permitida para cuentas administrativas.' };
     }
 
     const cleanCode = verificationCode.trim().replace(/\D/g, '');
     if (!cleanCode || cleanCode.length < 6) {
-      return { success: false, error: 'Ingresa el código completo de 6 dígitos que recibiste por SMS.' };
+      return { success: false, error: 'Ingresa el cÃ³digo completo de 6 dÃ­gitos que recibiste por SMS.' };
     }
 
     try {
@@ -1937,7 +1937,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
-      showToast('Número celular vinculado y verificado por SMS exitosamente');
+      showToast('NÃºmero celular vinculado y verificado por SMS exitosamente');
       return { success: true };
     } catch (err: any) {
       console.error('[Phone Linking Technical Error]:', err?.code, err?.message);
@@ -1949,25 +1949,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ) {
         return {
           success: false,
-          error: 'Este número celular ya está vinculado a otra cuenta',
+          error: 'Este nÃºmero celular ya estÃ¡ vinculado a otra cuenta',
         };
       }
 
       if (err.code === 'auth/provider-already-linked') {
-        return { success: false, error: 'Este número celular ya se encuentra vinculado a tu perfil.' };
+        return { success: false, error: 'Este nÃºmero celular ya se encuentra vinculado a tu perfil.' };
       }
 
       if (err.code === 'auth/invalid-verification-code') {
-        return { success: false, error: 'Código incorrecto. Verifica los 6 dígitos recibidos por SMS.' };
+        return { success: false, error: 'CÃ³digo incorrecto. Verifica los 6 dÃ­gitos recibidos por SMS.' };
       }
 
       if (err.code === 'auth/code-expired') {
-        return { success: false, error: 'Código vencido. Por favor solicita un nuevo código por SMS.' };
+        return { success: false, error: 'CÃ³digo vencido. Por favor solicita un nuevo cÃ³digo por SMS.' };
       }
 
       return { 
         success: false, 
-        error: err?.message || 'No se pudo vincular el número celular. Intenta nuevamente.' 
+        error: err?.message || 'No se pudo vincular el nÃºmero celular. Intenta nuevamente.' 
       };
     }
   }, [isAdmin, userClaims, currentWorker, showToast]);
@@ -2004,7 +2004,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     updates: Partial<Worker>
   ): Promise<{ success: boolean; error?: string }> => {
     if (!firebaseUser) {
-      return { success: false, error: 'No hay una sesión activa. Inicia sesión nuevamente.' };
+      return { success: false, error: 'No hay una sesiÃ³n activa. Inicia sesiÃ³n nuevamente.' };
     }
 
     const targetWorker = maestros.find((w) => w.id === workerId);
@@ -2096,7 +2096,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     isAvailable: boolean
   ): Promise<{ success: boolean; error?: string }> => {
     if (!firebaseUser) {
-      return { success: false, error: 'Debes iniciar sesión para actualizar tu disponibilidad.' };
+      return { success: false, error: 'Debes iniciar sesiÃ³n para actualizar tu disponibilidad.' };
     }
     const targetWorker = maestros.find((m) => m.id === workerId || m.userId === workerId);
     if (!targetWorker) {
@@ -2129,7 +2129,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     req: Omit<VerificationRequest, 'status' | 'requestedAt'> & { documents?: string[]; references?: string[] }
   ): Promise<{ success: boolean; error?: string }> => {
     if (!firebaseUser) {
-      return { success: false, error: 'Debes iniciar sesión para solicitar verificación.' };
+      return { success: false, error: 'Debes iniciar sesiÃ³n para solicitar verificaciÃ³n.' };
     }
 
     const nowIso = new Date().toISOString();
@@ -2218,7 +2218,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         try {
           const currentUser = auth.currentUser;
           if (!currentUser) {
-            return { success: false, error: 'Debes tener una sesión activa para publicar tu foto.' };
+            return { success: false, error: 'Debes tener una sesiÃ³n activa para publicar tu foto.' };
           }
           const token = await currentUser.getIdToken();
           const res = await fetch('/api/photos/self-publish', {
@@ -2231,7 +2231,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok || !data.success) {
-            return { success: false, error: data?.error || 'No se pudo publicar la fotografía.' };
+            return { success: false, error: data?.error || 'No se pudo publicar la fotografÃ­a.' };
           }
 
           setMaestros((prev) =>
@@ -2252,7 +2252,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return { success: true };
         } catch (err: any) {
           console.error('Error self-publishing profile photo:', err);
-          return { success: false, error: err?.message || 'Error al publicar la fotografía.' };
+          return { success: false, error: err?.message || 'Error al publicar la fotografÃ­a.' };
         }
       }
 
@@ -2287,7 +2287,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return { success: true };
       } catch (err: any) {
         console.error('Error submitting pending profile photo:', err);
-        return { success: false, error: err?.message || 'Error al enviar foto para moderación.' };
+        return { success: false, error: err?.message || 'Error al enviar foto para moderaciÃ³n.' };
       }
     },
     []
@@ -2309,7 +2309,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return { success: true, message: data.message || 'Gracias. Recibimos tu reporte y lo revisaremos.' };
       } catch (err: any) {
         console.error('Error submitting profile report:', err);
-        return { success: false, error: 'Error de conexión al enviar el reporte. Intenta nuevamente.' };
+        return { success: false, error: 'Error de conexiÃ³n al enviar el reporte. Intenta nuevamente.' };
       }
     },
     []
@@ -2324,7 +2324,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     ): Promise<{ success: boolean; publicUrl?: string; error?: string }> => {
       try {
         if (!auth.currentUser) {
-          return { success: false, error: 'Sesión administrativa no iniciada.' };
+          return { success: false, error: 'SesiÃ³n administrativa no iniciada.' };
         }
         const idToken = await auth.currentUser.getIdToken(true);
         const response = await fetch('/api/admin/profile-photo/review', {
@@ -2337,7 +2337,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
         const data = await response.json();
         if (!response.ok) {
-          return { success: false, error: data.error || 'Error al procesar la revisión de la fotografía.' };
+          return { success: false, error: data.error || 'Error al procesar la revisiÃ³n de la fotografÃ­a.' };
         }
 
         // Update local state in maestros
@@ -2371,7 +2371,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return { success: true, publicUrl: data.publicUrl };
       } catch (err: any) {
         console.error('Error in adminReviewProfilePhoto:', err);
-        return { success: false, error: err?.message || 'Error de conexión con el servidor.' };
+        return { success: false, error: err?.message || 'Error de conexiÃ³n con el servidor.' };
       }
     },
     []
@@ -2585,7 +2585,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Self-deletion for workers (privacy & account lifecycle)
   const deleteWorkerAccount = useCallback(async (workerId?: string): Promise<{ success: boolean; error?: string }> => {
     if (!firebaseUser) {
-      return { success: false, error: 'No hay una sesión activa.' };
+      return { success: false, error: 'No hay una sesiÃ³n activa.' };
     }
     const targetWorkerId = workerId || currentWorker?.id || firebaseUser.uid;
     const isOwner = firebaseUser.uid === targetWorkerId || currentWorker?.userId === firebaseUser.uid || currentWorker?.id === targetWorkerId;
@@ -2600,11 +2600,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         idToken = await firebaseUser.getIdToken(true);
       } catch (tokenErr: any) {
         console.error('[Account Deletion] Could not refresh ID token:', tokenErr);
-        return { success: false, error: 'No se pudo obtener el token de seguridad. Por favor vuelve a iniciar sesión.' };
+        return { success: false, error: 'No se pudo obtener el token de seguridad. Por favor vuelve a iniciar sesiÃ³n.' };
       }
 
       if (!idToken) {
-        return { success: false, error: 'Token de autorización ausente.' };
+        return { success: false, error: 'Token de autorizaciÃ³n ausente.' };
       }
 
       // 2. Call backend endpoint to delete Auth user, Firestore doc, subcollections & storage
@@ -2625,7 +2625,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           status: apiRes.status,
           data,
         });
-        const errorMsg = data?.error || data?.message || 'No se pudo completar la eliminación de tu cuenta en el servidor. Por favor intenta de nuevo.';
+        const errorMsg = data?.error || data?.message || 'No se pudo completar la eliminaciÃ³n de tu cuenta en el servidor. Por favor intenta de nuevo.';
         return { success: false, error: errorMsg };
       }
 
@@ -2710,9 +2710,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const isApproved = status === 'Aprobado';
 
-    // 4. REGLA TELÉFONO VERIFICADO:
+    // 4. REGLA TELÃ‰FONO VERIFICADO:
     // NO permitir "Aprobado" si no existe Phone Auth verificado.
-    // La fuente real debe venir de Firebase Auth, no sólo de un texto Firestore.
+    // La fuente real debe venir de Firebase Auth, no sÃ³lo de un texto Firestore.
     if (isApproved) {
       try {
         const authMap = await adminFetchAuthMethods([maestroId]);
@@ -2734,19 +2734,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (!hasVerifiedPhone) {
           return {
             success: false,
-            error: 'Este perfil todavía no puede aprobarse porque el teléfono no ha sido verificado por SMS.',
+            error: 'Este perfil todavÃ­a no puede aprobarse porque el telÃ©fono no ha sido verificado por SMS.',
           };
         }
       } catch (checkErr) {
         console.warn('Error checking auth methods before approval:', checkErr);
         return {
           success: false,
-          error: 'No se pudo validar el estado de verificación telefónica del maestro. Intenta de nuevo.',
+          error: 'No se pudo validar el estado de verificaciÃ³n telefÃ³nica del maestro. Intenta de nuevo.',
         };
       }
     }
 
-    // Semántica:
+    // SemÃ¡ntica:
     // Pendiente: aprobado = false, statusPerfil = 'Pendiente'
     // Aprobado: aprobado = true, statusPerfil = 'Aprobado'
     // NO modificar isAvailable al cambiar el status administrativo.
@@ -2846,7 +2846,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const adminDeleteMaestro = useCallback(async (maestroId: string): Promise<{ success: boolean; error?: string }> => {
     if (!firebaseUser) {
-      const msg = 'No hay una sesión administrativa activa.';
+      const msg = 'No hay una sesiÃ³n administrativa activa.';
       showToast(msg);
       return { success: false, error: msg };
     }
@@ -2882,7 +2882,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { success: true };
     } catch (err: any) {
       console.error('[Admin Delete Maestro Exception]:', err);
-      const errorMsg = err?.message || 'Error de conexión al eliminar la cuenta del maestro.';
+      const errorMsg = err?.message || 'Error de conexiÃ³n al eliminar la cuenta del maestro.';
       showToast(`Error: ${errorMsg}`);
       return { success: false, error: errorMsg };
     }
