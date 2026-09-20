@@ -930,51 +930,18 @@ async function startServer() {
   // - Absolutely NO Identity Toolkit REST fallback (eliminates CREDENTIAL_TOO_OLD_LOGIN_AGAIN)
   // - Result verification: Auth (user-not-found), Firestore (doc deleted), Storage (clean)
   // =========================================================================
-  const handleAccountDeletion = async (req: Request, res: Response): Promise<void> => {
+  type AccountDeletionResult =
+    | { success: true; deletedUid: string }
+    | { success: false; status: number; step?: string; error: string; code?: string; details?: string };
+
+  /**
+   * Core deletion logic shared by the owner-facing /api/account endpoint and the
+   * ManyChat phone-authenticated account-action endpoint. Callers are responsible
+   * for authenticating/authorizing the caller and resolving targetUid first.
+   */
+  async function performAccountDeletion(targetUid: string): Promise<AccountDeletionResult> {
     try {
-      const authHeader = req.headers["authorization"] || "";
-      const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.substring(7).trim() : "";
-
-      if (!bearerToken) {
-        res.status(401).json({ 
-          success: false, 
-          error: "No autorizado. Token de sesiÃ³n no proporcionado." 
-        });
-        return;
-      }
-
-      // 1. Verify ID token with Firebase Admin
-      let decodedToken: any;
-      try {
-        decodedToken = await adminAuth.verifyIdToken(bearerToken);
-      } catch (verifyErr: any) {
-        console.error("[Account Deletion] Token verification failed:", verifyErr?.message);
-        res.status(401).json({ 
-          success: false, 
-          error: "SesiÃ³n invÃ¡lida o expirada. Inicia sesiÃ³n de nuevo." 
-        });
-        return;
-      }
-
-      const callerUid = decodedToken.uid;
-      const isCallerAdmin = decodedToken.admin === true;
-
-      // Strict security rule:
-      // - Non-admin users can ONLY delete their own verified UID. Any workerId sent in body/query is strictly ignored.
-      // - Only verified admins can provide a target workerId to delete a worker's account administratively.
-      const requestedWorkerId = (req.body?.workerId || req.query?.workerId || "").toString().trim();
-      const targetUid = isCallerAdmin && requestedWorkerId ? requestedWorkerId : callerUid;
-
-      // Ownership check: only owner or verified admin can delete
-      if (targetUid !== callerUid && !isCallerAdmin) {
-        res.status(403).json({ 
-          success: false, 
-          error: "No tienes permisos para eliminar esta cuenta." 
-        });
-        return;
-      }
-
-      console.log(`[Account Deletion] Starting atomic deletion for UID: ${targetUid} (requested by caller: ${callerUid}, isCallerAdmin: ${isCallerAdmin})`);
+      console.log(`[Account Deletion] Starting atomic deletion for UID: ${targetUid}`);
 
       // 2. Step A: Delete Storage objects via adminStorage
       const storagePrefixes = [
@@ -1001,14 +968,14 @@ async function startServer() {
             continue;
           }
           console.error(`[Account Deletion] Storage error deleting prefix ${prefix} for ${targetUid}:`, stErr);
-          res.status(500).json({
+          return {
             success: false,
+            status: 500,
             step: "delete-storage",
             code: stErr?.code || "storage/delete-failed",
             error: `Error al eliminar archivos de almacenamiento en Storage bajo '${prefix}'.`,
             details: stErr?.message,
-          });
-          return;
+          };
         }
       }
 
@@ -1036,14 +1003,14 @@ async function startServer() {
         }
       } catch (fsErr: any) {
         console.error(`[Account Deletion] Firestore error for UID ${targetUid}:`, fsErr);
-        res.status(500).json({
+        return {
           success: false,
+          status: 500,
           step: "delete-firestore",
           code: fsErr?.code || "firestore/delete-failed",
           error: "Error al eliminar los datos de perfil y colecciones en Firestore.",
           details: fsErr?.message,
-        });
-        return;
+        };
       }
 
       // 4. Step C: Delete user from Firebase Authentication via adminAuth exclusively
@@ -1055,14 +1022,14 @@ async function startServer() {
           console.log(`[Account Deletion] User ${targetUid} was already absent from Firebase Auth.`);
         } else {
           console.error(`[Account Deletion] adminAuth.deleteUser failed for ${targetUid}:`, delErr);
-          res.status(500).json({
+          return {
             success: false,
+            status: 500,
             step: "delete-auth-user",
             error: delErr?.message || "No se pudo eliminar el usuario de Firebase Authentication.",
             code: delErr?.code || "auth/delete-user-failed",
             details: delErr?.message,
-          });
-          return;
+          };
         }
       }
 
@@ -1071,23 +1038,23 @@ async function startServer() {
       try {
         const remainingUser = await adminAuth.getUser(targetUid);
         if (remainingUser) {
-          res.status(500).json({
+          return {
             success: false,
+            status: 500,
             step: "verify-auth",
             error: `La cuenta ${targetUid} todavÃ­a existe en Firebase Authentication tras la eliminaciÃ³n.`,
-          });
-          return;
+          };
         }
       } catch (checkAuthErr: any) {
         if (checkAuthErr?.code !== "auth/user-not-found") {
-          res.status(500).json({
+          return {
             success: false,
+            status: 500,
             step: "verify-auth",
             code: checkAuthErr?.code || "auth/verification-failed",
             error: "No se pudo verificar el estado de eliminaciÃ³n en Firebase Authentication.",
             details: checkAuthErr?.message,
-          });
-          return;
+          };
         }
       }
 
@@ -1095,22 +1062,22 @@ async function startServer() {
       try {
         const checkDoc = await adminDb.doc(`maestros/${targetUid}`).get();
         if (checkDoc.exists) {
-          res.status(500).json({
+          return {
             success: false,
+            status: 500,
             step: "verify-firestore",
             error: `El documento /maestros/${targetUid} aÃºn existe en Firestore tras la eliminaciÃ³n.`,
-          });
-          return;
+          };
         }
       } catch (checkFsErr: any) {
-        res.status(500).json({
+        return {
           success: false,
+          status: 500,
           step: "verify-firestore",
           code: checkFsErr?.code || "firestore/verification-failed",
           error: "No se pudo verificar la eliminaciÃ³n del documento en Firestore.",
           details: checkFsErr?.message,
-        });
-        return;
+        };
       }
 
       // C. Verify Storage prefixes have no remaining objects
@@ -1118,12 +1085,12 @@ async function startServer() {
         try {
           const [remainingFiles] = await bucket.getFiles({ prefix, maxResults: 1 });
           if (remainingFiles && remainingFiles.length > 0) {
-            res.status(500).json({
+            return {
               success: false,
+              status: 500,
               step: "verify-storage",
               error: `AÃºn existen archivos personales en Storage bajo el prefijo '${prefix}'.`,
-            });
-            return;
+            };
           }
         } catch (stVerifyErr: any) {
           if (stVerifyErr?.code === 403 || String(stVerifyErr?.message).includes("storage.objects.list")) {
@@ -1131,37 +1098,208 @@ async function startServer() {
             continue;
           }
           if (stVerifyErr?.code !== 404) {
-            res.status(500).json({
+            return {
               success: false,
+              status: 500,
               step: "verify-storage",
               code: stVerifyErr?.code || "storage/verification-failed",
               error: `Error al verificar la eliminaciÃ³n de archivos en Storage bajo '${prefix}'.`,
               details: stVerifyErr?.message,
-            });
-            return;
+            };
           }
         }
       }
 
       // All steps passed and verified
       console.log(`[Account Deletion] UID ${targetUid} verified completely deleted across Auth, Firestore, and Storage.`);
-      res.status(200).json({
-        success: true,
-        message: "Cuenta y datos personales eliminados exitosamente.",
-        deletedUid: targetUid,
-      });
+      return { success: true, deletedUid: targetUid };
     } catch (err: any) {
       console.error("[Account Deletion] Unexpected error:", err);
-      res.status(500).json({
+      return {
         success: false,
+        status: 500,
         error: "OcurriÃ³ un error en el servidor al procesar la eliminaciÃ³n de la cuenta.",
         details: err?.message,
-      });
+      };
     }
+  }
+
+  const handleAccountDeletion = async (req: Request, res: Response): Promise<void> => {
+    const authHeader = req.headers["authorization"] || "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.substring(7).trim() : "";
+
+    if (!bearerToken) {
+      res.status(401).json({
+        success: false,
+        error: "No autorizado. Token de sesiÃ³n no proporcionado.",
+      });
+      return;
+    }
+
+    let decodedToken: any;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(bearerToken);
+    } catch (verifyErr: any) {
+      console.error("[Account Deletion] Token verification failed:", verifyErr?.message);
+      res.status(401).json({
+        success: false,
+        error: "SesiÃ³n invÃ¡lida o expirada. Inicia sesiÃ³n de nuevo.",
+      });
+      return;
+    }
+
+    const callerUid = decodedToken.uid;
+    const isCallerAdmin = decodedToken.admin === true;
+
+    // Strict security rule:
+    // - Non-admin users can ONLY delete their own verified UID. Any workerId sent in body/query is strictly ignored.
+    // - Only verified admins can provide a target workerId to delete a worker's account administratively.
+    const requestedWorkerId = (req.body?.workerId || req.query?.workerId || "").toString().trim();
+    const targetUid = isCallerAdmin && requestedWorkerId ? requestedWorkerId : callerUid;
+
+    if (targetUid !== callerUid && !isCallerAdmin) {
+      res.status(403).json({
+        success: false,
+        error: "No tienes permisos para eliminar esta cuenta.",
+      });
+      return;
+    }
+
+    const result: AccountDeletionResult = await performAccountDeletion(targetUid);
+    if (result.success === false) {
+      res.status(result.status).json({
+        success: false,
+        step: result.step,
+        error: result.error,
+        code: result.code,
+        details: result.details,
+      });
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      message: "Cuenta y datos personales eliminados exitosamente.",
+      deletedUid: result.deletedUid,
+    });
   };
 
   app.delete("/api/account", handleAccountDeletion);
   app.post("/api/account/delete", handleAccountDeletion);
+
+  // =========================================================================
+  // MANYCHAT ACCOUNT MENU ENDPOINT
+  // POST /api/manychat/account-action
+  //
+  // Lets the WhatsApp flow, once it recognizes a returning phone number, let
+  // that worker check their status, pause their public listing, or delete
+  // their account entirely, without a Firebase Auth ID token (WhatsApp has no
+  // such concept) — authenticated instead by the same MANYCHAT_WEBHOOK_SECRET
+  // used by the rest of the ManyChat integration, and scoped strictly to the
+  // Auth user matching the sender's own verified WhatsApp phone number.
+  // =========================================================================
+  app.post("/api/manychat/account-action", manyChatWebhookRateLimit, async (req: Request, res: Response): Promise<void> => {
+    try {
+      const expectedSecret = process.env.MANYCHAT_WEBHOOK_SECRET;
+      if (!expectedSecret || expectedSecret.trim() === "") {
+        res.status(503).json({ success: false, error: "Servicio no configurado" });
+        return;
+      }
+      const rawHeaderKey = req.get("x-api-key") || (req.headers["x-api-key"] as string | undefined);
+      const apiKey = Array.isArray(rawHeaderKey) ? rawHeaderKey[0] : rawHeaderKey;
+      if (!apiKey || !secretsMatch(apiKey, expectedSecret)) {
+        res.status(401).json({ success: false, error: "Unauthorized" });
+        return;
+      }
+
+      const body = req.body || {};
+      const rawPhone = (body.telefono || body.whatsapp_id || body.phone || "").toString().trim();
+      const action = (body.action || "status").toString().trim().toLowerCase();
+
+      const { e164, isValid } = normalizeMexicanPhone(rawPhone);
+      if (!isValid) {
+        res.status(400).json({ success: false, error: "NÃºmero de telÃ©fono no vÃ¡lido." });
+        return;
+      }
+
+      let authUser;
+      try {
+        authUser = await adminAuth.getUserByPhoneNumber(e164);
+      } catch (lookupErr: any) {
+        if (lookupErr?.code === "auth/user-not-found") {
+          res.status(200).json({ success: true, exists: false });
+          return;
+        }
+        throw lookupErr;
+      }
+
+      const uid = authUser.uid;
+      const workerRef = adminDb.collection("maestros").doc(uid);
+      const workerSnap = await workerRef.get();
+
+      if (!workerSnap.exists) {
+        res.status(200).json({ success: true, exists: false });
+        return;
+      }
+
+      const data = workerSnap.data() || {};
+
+      if (action === "status") {
+        res.status(200).json({
+          success: true,
+          exists: true,
+          nombre: data.nombre || "",
+          oficio: data.oficio || data.oficioPrincipal || "",
+          ciudad: data.ciudad || data.ciudadPrincipal || "",
+          pausado: data.pausado === true,
+          slug: data.slug || "",
+        });
+        return;
+      }
+
+      if (action === "pause") {
+        if (data.pausado === true) {
+          res.status(200).json({ success: true, message: "Tu cuenta ya estaba pausada." });
+          return;
+        }
+        await workerRef.update({
+          pausado: true,
+          aprobadoPrePausa: data.aprobado === true,
+          aprobado: false,
+          pausadoAt: new Date().toISOString(),
+        });
+        res.status(200).json({ success: true, message: "Tu perfil se pausÃ³ y ya no aparece en las bÃºsquedas pÃºblicas." });
+        return;
+      }
+
+      if (action === "resume") {
+        if (data.pausado !== true) {
+          res.status(200).json({ success: true, message: "Tu cuenta ya estaba activa." });
+          return;
+        }
+        await workerRef.update({
+          pausado: false,
+          aprobado: data.aprobadoPrePausa === true,
+        });
+        res.status(200).json({ success: true, message: "Tu perfil se reactivÃ³." });
+        return;
+      }
+
+      if (action === "delete") {
+        const result: AccountDeletionResult = await performAccountDeletion(uid);
+        if (result.success === false) {
+          res.status(result.status).json({ success: false, error: result.error, step: result.step });
+          return;
+        }
+        res.status(200).json({ success: true, message: "Tu cuenta fue eliminada exitosamente.", deletedUid: result.deletedUid });
+        return;
+      }
+
+      res.status(400).json({ success: false, error: "AcciÃ³n no reconocida." });
+    } catch (err: any) {
+      console.error("[ManyChat Account Action] Unhandled error:", err);
+      res.status(500).json({ success: false, error: err?.message || "Error al procesar la solicitud." });
+    }
+  });
 
   // =========================================================================
   // ONBOARDING CANCELLATION ENDPOINT (Disposable Incomplete Registrations)
