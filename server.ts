@@ -828,34 +828,41 @@ async function startServer() {
       //    This is a "Trabajos realizados" portfolio photo, NOT the profile
       //    avatar â€” the avatar always stays the generic default icon unless
       //    the worker explicitly uploads a profile photo elsewhere.
-      const workPhotoUrls: string[] = [];
-      for (const fotoUrl of fotoUrls) {
-        try {
-          await assertPublicHttpUrl(fotoUrl);
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000);
-          const imgRes = await fetch(fotoUrl, { signal: controller.signal });
-          clearTimeout(timeoutId);
-          if (imgRes.ok) {
-            const arrayBuffer = await imgRes.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            const contentType = imgRes.headers.get("content-type") || "image/jpeg";
-            if (buffer.length <= 10 * 1024 * 1024) {
-              const moderation = await moderateImageContent(buffer, contentType);
-              if (moderation.safe) {
-                const bucket = adminStorage.bucket();
-                const publicPath = `portafolios/${uid}/trabajo_manychat_${Date.now()}_${workPhotoUrls.length}.jpg`;
-                await bucket.file(publicPath).save(buffer, { metadata: { contentType } });
-                workPhotoUrls.push(`https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(publicPath)}?alt=media`);
-              } else {
-                console.warn(`[ManyChat Finalize] Photo rejected by moderation for ${uid}: ${moderation.reason}`);
+      // Processed in parallel (not one-by-one): 5 sequential downloads +
+      // Gemini moderation calls could take 30-150+ seconds total, well past
+      // ManyChat's External Request timeout, causing it to give up on a
+      // registration that actually succeeded moments later on the server.
+      const workPhotoResults = await Promise.all(
+        fotoUrls.map(async (fotoUrl, idx): Promise<string | null> => {
+          try {
+            await assertPublicHttpUrl(fotoUrl);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            const imgRes = await fetch(fotoUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (imgRes.ok) {
+              const arrayBuffer = await imgRes.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+              const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+              if (buffer.length <= 10 * 1024 * 1024) {
+                const moderation = await moderateImageContent(buffer, contentType);
+                if (moderation.safe) {
+                  const bucket = adminStorage.bucket();
+                  const publicPath = `portafolios/${uid}/trabajo_manychat_${Date.now()}_${idx}.jpg`;
+                  await bucket.file(publicPath).save(buffer, { metadata: { contentType } });
+                  return `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(publicPath)}?alt=media`;
+                } else {
+                  console.warn(`[ManyChat Finalize] Photo rejected by moderation for ${uid}: ${moderation.reason}`);
+                }
               }
             }
+          } catch (photoErr: any) {
+            console.warn("[ManyChat Finalize] Photo fetch/moderation skipped:", photoErr?.message);
           }
-        } catch (photoErr: any) {
-          console.warn("[ManyChat Finalize] Photo fetch/moderation skipped:", photoErr?.message);
-        }
-      }
+          return null;
+        })
+      );
+      const workPhotoUrls: string[] = workPhotoResults.filter((url): url is string => Boolean(url));
 
       // 3. Publish the profile. phoneVerified=true is attested by the
       //    WhatsApp Business Platform identity, not Firebase SMS â€” the
