@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+﻿import dotenv from "dotenv";
 dotenv.config();
 import express, { Request, Response } from "express";
 import path from "path";
@@ -12,6 +12,7 @@ import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 import dns from "dns";
 import net from "net";
+import crypto from "crypto";
 
 // Load Firebase configuration
 const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -22,7 +23,7 @@ try {
   } else {
     console.warn(
       "[Firebase Admin Warning]: El archivo firebase-applet-config.json no existe. " +
-      "Las operaciones del Admin SDK (verificación telefónica, reportes y webhook ManyChat) funcionarán en modo degradado."
+      "Las operaciones del Admin SDK (verificaciÃ³n telefÃ³nica, reportes y webhook ManyChat) funcionarÃ¡n en modo degradado."
     );
   }
 } catch (err: any) {
@@ -31,8 +32,8 @@ try {
 
 if (!firebaseConfig.projectId) {
   console.warn(
-    "[Firebase Admin Warning]: Falta 'projectId' en la configuración de Firebase. " +
-    "La persistencia en Firestore y la verificación de tokens en el servidor podrían fallar."
+    "[Firebase Admin Warning]: Falta 'projectId' en la configuraciÃ³n de Firebase. " +
+    "La persistencia en Firestore y la verificaciÃ³n de tokens en el servidor podrÃ­an fallar."
   );
 }
 
@@ -52,15 +53,15 @@ const adminStorage = getAdminStorage(adminApp);
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 if (!genAI) {
   console.warn(
-    "[Gemini Moderation Warning]: GEMINI_API_KEY no configurada. La moderación automática de fotos de perfil " +
-    "se omitirá (fail-open) hasta que se configure la variable de entorno."
+    "[Gemini Moderation Warning]: GEMINI_API_KEY no configurada. La moderaciÃ³n automÃ¡tica de fotos de perfil " +
+    "se omitirÃ¡ (fail-open) hasta que se configure la variable de entorno."
   );
 }
 
 /**
  * Uses Gemini's vision capability to screen a profile photo before it goes public.
  * Fails open (treats the image as safe) on any API/parsing error so a flaky external
- * call never permanently blocks a legitimate worker from publishing their photo —
+ * call never permanently blocks a legitimate worker from publishing their photo â€”
  * the goal is a moderation net, not a hard gate the whole feature depends on.
  */
 async function moderateImageContent(
@@ -83,12 +84,12 @@ async function moderateImageContent(
         },
         {
           text:
-            "Esta imagen se publicará como foto de perfil pública de un trabajador de la construcción " +
-            "(albañil, electricista, plomero, etc.) en un directorio de servicios en México. " +
-            "Responde ÚNICAMENTE con 'SAFE' si es una foto de perfil apropiada (persona, rostro, o " +
-            "trabajo/herramientas, sin contenido sexual, desnudez, violencia gráfica, sangre, armas, " +
-            "símbolos de odio, o cualquier otro contenido ofensivo o inapropiado). " +
-            "Si NO es apropiada, responde ÚNICAMENTE con 'UNSAFE: ' seguido de una razón breve en español.",
+            "Esta imagen se publicarÃ¡ como foto de perfil pÃºblica de un trabajador de la construcciÃ³n " +
+            "(albaÃ±il, electricista, plomero, etc.) en un directorio de servicios en MÃ©xico. " +
+            "Responde ÃšNICAMENTE con 'SAFE' si es una foto de perfil apropiada (persona, rostro, o " +
+            "trabajo/herramientas, sin contenido sexual, desnudez, violencia grÃ¡fica, sangre, armas, " +
+            "sÃ­mbolos de odio, o cualquier otro contenido ofensivo o inapropiado). " +
+            "Si NO es apropiada, responde ÃšNICAMENTE con 'UNSAFE: ' seguido de una razÃ³n breve en espaÃ±ol.",
         },
       ],
     });
@@ -99,7 +100,7 @@ async function moderateImageContent(
     }
     return { safe: true };
   } catch (err: any) {
-    console.error("[Gemini Moderation ERROR]: Falló la clasificación, se permite la publicación sin filtro (fail-open):", err?.message);
+    console.error("[Gemini Moderation ERROR]: FallÃ³ la clasificaciÃ³n, se permite la publicaciÃ³n sin filtro (fail-open):", err?.message);
     return { safe: true };
   }
 }
@@ -162,7 +163,7 @@ function normalizeMexicanPhone(rawPhone: string): { e164: string; digitsOnly: st
 const DISPONIBILIDAD_OPTIONS = [
   "Lunes a viernes",
   "Fines de semana",
-  "Todos los días",
+  "Todos los dÃ­as",
   "Medio tiempo",
   "Bajo cita",
 ] as const;
@@ -171,19 +172,19 @@ function normalizeDisponibilidad(raw: string): string {
   const text = raw.trim().toLowerCase();
   if (!text) return "";
 
-  const hasWeekdays = /(lunes|martes|mi[eé]rcoles|jueves|viernes|semana)/.test(text);
-  const hasWeekend = /(fin de semana|fines de semana|s[aá]bado|domingo)/.test(text);
-  const isFullTime = /(todos los d[ií]as|tiempo completo|cualquier d[ií]a|24\/7|siempre)/.test(text);
-  const isPartTime = /(medio tiempo|medio d[ií]a|algunas horas|parcial)/.test(text);
+  const hasWeekdays = /(lunes|martes|mi[eÃ©]rcoles|jueves|viernes|semana)/.test(text);
+  const hasWeekend = /(fin de semana|fines de semana|s[aÃ¡]bado|domingo)/.test(text);
+  const isFullTime = /(todos los d[iÃ­]as|tiempo completo|cualquier d[iÃ­]a|24\/7|siempre)/.test(text);
+  const isPartTime = /(medio tiempo|medio d[iÃ­]a|algunas horas|parcial)/.test(text);
   const isByAppointment = /(cita|agendar|previa cita|por proyecto)/.test(text);
 
-  if (isFullTime || (hasWeekdays && hasWeekend)) return "Todos los días";
+  if (isFullTime || (hasWeekdays && hasWeekend)) return "Todos los dÃ­as";
   if (hasWeekend && !hasWeekdays) return "Fines de semana";
   if (hasWeekdays) return "Lunes a viernes";
   if (isPartTime) return "Medio tiempo";
   if (isByAppointment) return "Bajo cita";
 
-  // No confident match — keep the raw answer rather than silently discarding it.
+  // No confident match â€” keep the raw answer rather than silently discarding it.
   return raw.trim();
 }
 
@@ -247,6 +248,13 @@ function isPrivateOrLoopbackIp(ip: string): boolean {
     return false;
   }
   return true; // unknown format: treat as unsafe
+}
+
+function secretsMatch(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 async function assertPublicHttpUrl(rawUrl: string): Promise<void> {
@@ -346,6 +354,40 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
   // =========================================================================
+  // GENERIC IN-MEMORY SLIDING-WINDOW RATE LIMITER (zero cost, no external deps)
+  // Keyed by client IP; each call site gets its own independent bucket.
+  // =========================================================================
+  function createRateLimiter(windowMs: number, maxRequests: number) {
+    const hits = new Map<string, { count: number; resetAt: number }>();
+    setInterval(() => {
+      const now = Date.now();
+      for (const [key, val] of hits.entries()) {
+        if (now > val.resetAt) hits.delete(key);
+      }
+    }, 5 * 60 * 1000);
+
+    return (req: Request, res: Response, next: () => void) => {
+      const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown-client";
+      const now = Date.now();
+      const record = hits.get(clientIp);
+      if (!record || now > record.resetAt) {
+        hits.set(clientIp, { count: 1, resetAt: now + windowMs });
+        next();
+        return;
+      }
+      if (record.count >= maxRequests) {
+        res.status(429).json({ success: false, error: "Demasiadas solicitudes. Por favor espera un momento antes de reintentar." });
+        return;
+      }
+      record.count += 1;
+      next();
+    };
+  }
+
+  const manyChatWebhookRateLimit = createRateLimiter(60 * 1000, 60); // 60 req/min per IP
+  const generateSlugRateLimit = createRateLimiter(60 * 1000, 20); // 20 req/min per IP
+
+  // =========================================================================
   // HEALTH CHECK
   // =========================================================================
   app.get("/api/health", (_req: Request, res: Response) => {
@@ -380,7 +422,7 @@ async function startServer() {
       const rawHeaderKey = req.get("x-api-key") || (req.headers["x-api-key"] as string | undefined);
       const apiKey = Array.isArray(rawHeaderKey) ? rawHeaderKey[0] : rawHeaderKey;
 
-      if (!apiKey || apiKey !== expectedSecret) {
+      if (!apiKey || !secretsMatch(apiKey, expectedSecret)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -444,7 +486,7 @@ async function startServer() {
 
               res.status(200).json({
                 status: "success",
-                message: "Conversación de WhatsApp cancelada; perfil activo del maestro preservado.",
+                message: "ConversaciÃ³n de WhatsApp cancelada; perfil activo del maestro preservado.",
               });
               return;
             }
@@ -572,13 +614,13 @@ async function startServer() {
       console.error("[ManyChat Webhook] Unhandled error:", err);
       res.status(500).json({
         error: "Internal server error",
-        message: err?.message || "Ocurrió un error inesperado al procesar el webhook.",
+        message: err?.message || "OcurriÃ³ un error inesperado al procesar el webhook.",
       });
     }
   };
 
-  app.post("/api/webhooks/manychat", handleManyChatWebhook);
-  app.post("/api/manychat/register", handleManyChatWebhook);
+  app.post("/api/webhooks/manychat", manyChatWebhookRateLimit, handleManyChatWebhook);
+  app.post("/api/manychat/register", manyChatWebhookRateLimit, handleManyChatWebhook);
 
   // =========================================================================
   // MANYCHAT FINALIZE REGISTRATION ENDPOINT (WhatsApp-only onboarding, no browser)
@@ -586,23 +628,23 @@ async function startServer() {
   //
   // This is the ONLY endpoint that turns a WhatsApp conversation into a real,
   // published /maestros profile. Identity is anchored EXCLUSIVELY to the
-  // ManyChat "WhatsApp ID" System Field (whatsapp_id) — the number Meta's
+  // ManyChat "WhatsApp ID" System Field (whatsapp_id) â€” the number Meta's
   // WhatsApp Business Platform cryptographically attests the message came
   // from. It must NEVER be filled from a free-text bot answer (e.g. a custom
-  // field capturing "¿cuál es tu número?"), since that can be typed by anyone
+  // field capturing "Â¿cuÃ¡l es tu nÃºmero?"), since that can be typed by anyone
   // and would let a visitor impersonate or fabricate profiles for other
   // numbers. The public contact number is always forced to equal this same
-  // WhatsApp ID — there is no way to register a different public number
+  // WhatsApp ID â€” there is no way to register a different public number
   // through this flow (that would require a separate, real OTP proof).
   //
   // Anti-duplication guarantee: Firebase Auth enforces that a phone number
   // can belong to at most one user account project-wide. By resolving/creating
   // the Auth user here (adminAuth.getUserByPhoneNumber / createUser) instead of
   // leaving account creation to a client-side flow, repeated registration
-  // attempts for the same WhatsApp ID always resolve to the same UID — it is
+  // attempts for the same WhatsApp ID always resolve to the same UID â€” it is
   // structurally impossible to end up with 10 profiles for one phone number.
   // =========================================================================
-  app.post("/api/manychat/finalize-registration", async (req: Request, res: Response): Promise<void> => {
+  app.post("/api/manychat/finalize-registration", manyChatWebhookRateLimit, async (req: Request, res: Response): Promise<void> => {
     try {
       const expectedSecret = process.env.MANYCHAT_WEBHOOK_SECRET;
       if (!expectedSecret || expectedSecret.trim() === "") {
@@ -611,7 +653,7 @@ async function startServer() {
       }
       const rawHeaderKey = req.get("x-api-key") || (req.headers["x-api-key"] as string | undefined);
       const apiKey = Array.isArray(rawHeaderKey) ? rawHeaderKey[0] : rawHeaderKey;
-      if (!apiKey || apiKey !== expectedSecret) {
+      if (!apiKey || !secretsMatch(apiKey, expectedSecret)) {
         res.status(401).json({ success: false, error: "Unauthorized" });
         return;
       }
@@ -621,10 +663,10 @@ async function startServer() {
       // Identity anchor: ONLY the verified WhatsApp number. ManyChat's flow-builder
       // UI does not expose "WhatsApp ID" as an insertable token anywhere (confirmed:
       // absent from the External Request field picker, the Set User Field value
-      // picker, and search by name in both) — it only ever appears inside the raw
+      // picker, and search by name in both) â€” it only ever appears inside the raw
       // subscriber object produced by "Full Contact Data". So this endpoint accepts
       // EITHER a direct whatsapp_id (in case a future ManyChat feature exposes it
-      // as a token) OR a full_contact object/JSON-string from "+ Añadir Full Contact
+      // as a token) OR a full_contact object/JSON-string from "+ AÃ±adir Full Contact
       // Data", and pulls the verified number out of the latter's whatsapp_phone /
       // whatsapp_id field. A free-text phone answer typed by the user must NEVER be
       // accepted here, since that can be typed by anyone and would let a visitor
@@ -640,11 +682,11 @@ async function startServer() {
         "";
       const { e164, digitsOnly, isValid } = normalizeMexicanPhone(rawWhatsAppId);
       if (!isValid) {
-        res.status(400).json({ success: false, error: "No se encontró un WhatsApp verificado válido. Envía whatsapp_id o full_contact (Full Contact Data de ManyChat), nunca una respuesta de texto libre." });
+        res.status(400).json({ success: false, error: "No se encontrÃ³ un WhatsApp verificado vÃ¡lido. EnvÃ­a whatsapp_id o full_contact (Full Contact Data de ManyChat), nunca una respuesta de texto libre." });
         return;
       }
 
-      // Required fields to actually publish a profile — until the bot has
+      // Required fields to actually publish a profile â€” until the bot has
       // collected all of these, ManyChat should keep talking, not finalize.
       const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
       const apellido = typeof body.apellido === "string" ? body.apellido.trim() : "";
@@ -706,7 +748,7 @@ async function startServer() {
       const existingSnap = await workerRef.get();
       const existingData = existingSnap.exists ? existingSnap.data() || {} : {};
 
-      // Never downgrade or resurrect an already-approved, complete profile —
+      // Never downgrade or resurrect an already-approved, complete profile â€”
       // treat a repeat finalize call for the same person as a no-op success.
       if (existingSnap.exists && existingData.aprobado === true && existingData.onboardingIncomplete !== true) {
         res.status(200).json({ success: true, workerId: uid, slug: existingData.slug, alreadyExisted: true });
@@ -721,7 +763,7 @@ async function startServer() {
       //    website's self-publish flow. Never publish an unmoderated image
       //    just because this path skips human admin approval.
       //    This is a "Trabajos realizados" portfolio photo, NOT the profile
-      //    avatar — the avatar always stays the generic default icon unless
+      //    avatar â€” the avatar always stays the generic default icon unless
       //    the worker explicitly uploads a profile photo elsewhere.
       const workPhotoUrls: string[] = [];
       for (const fotoUrl of fotoUrls) {
@@ -753,7 +795,7 @@ async function startServer() {
       }
 
       // 3. Publish the profile. phoneVerified=true is attested by the
-      //    WhatsApp Business Platform identity, not Firebase SMS — the
+      //    WhatsApp Business Platform identity, not Firebase SMS â€” the
       //    distinct phoneVerificationMethod records exactly that provenance.
       //    Per product policy, this profile auto-publishes (aprobado=true)
       //    without human review; identityVerified/referencesVerified stay
@@ -768,8 +810,8 @@ async function startServer() {
         oficio: oficioPrincipal,
         mainTrade: oficioPrincipal,
         oficioPrincipal,
-        bio: servicios.length > 0 ? `${oficioPrincipal} en ${ciudad || "Querétaro"}. ${servicios.join(", ")}.` : `Especialista en ${oficioPrincipal}.`,
-        description: servicios.length > 0 ? `${oficioPrincipal} en ${ciudad || "Querétaro"}. ${servicios.join(", ")}.` : `Especialista en ${oficioPrincipal}.`,
+        bio: servicios.length > 0 ? `${oficioPrincipal} en ${ciudad || "QuerÃ©taro"}. ${servicios.join(", ")}.` : `Especialista en ${oficioPrincipal}.`,
+        description: servicios.length > 0 ? `${oficioPrincipal} en ${ciudad || "QuerÃ©taro"}. ${servicios.join(", ")}.` : `Especialista en ${oficioPrincipal}.`,
         ciudad: ciudad || "",
         serviceAreas: zonas,
         zonas: zonasRaw,
@@ -868,7 +910,7 @@ async function startServer() {
       if (!bearerToken) {
         res.status(401).json({ 
           success: false, 
-          error: "No autorizado. Token de sesión no proporcionado." 
+          error: "No autorizado. Token de sesiÃ³n no proporcionado." 
         });
         return;
       }
@@ -881,7 +923,7 @@ async function startServer() {
         console.error("[Account Deletion] Token verification failed:", verifyErr?.message);
         res.status(401).json({ 
           success: false, 
-          error: "Sesión inválida o expirada. Inicia sesión de nuevo." 
+          error: "SesiÃ³n invÃ¡lida o expirada. Inicia sesiÃ³n de nuevo." 
         });
         return;
       }
@@ -1004,7 +1046,7 @@ async function startServer() {
           res.status(500).json({
             success: false,
             step: "verify-auth",
-            error: `La cuenta ${targetUid} todavía existe en Firebase Authentication tras la eliminación.`,
+            error: `La cuenta ${targetUid} todavÃ­a existe en Firebase Authentication tras la eliminaciÃ³n.`,
           });
           return;
         }
@@ -1014,7 +1056,7 @@ async function startServer() {
             success: false,
             step: "verify-auth",
             code: checkAuthErr?.code || "auth/verification-failed",
-            error: "No se pudo verificar el estado de eliminación en Firebase Authentication.",
+            error: "No se pudo verificar el estado de eliminaciÃ³n en Firebase Authentication.",
             details: checkAuthErr?.message,
           });
           return;
@@ -1028,7 +1070,7 @@ async function startServer() {
           res.status(500).json({
             success: false,
             step: "verify-firestore",
-            error: `El documento /maestros/${targetUid} aún existe en Firestore tras la eliminación.`,
+            error: `El documento /maestros/${targetUid} aÃºn existe en Firestore tras la eliminaciÃ³n.`,
           });
           return;
         }
@@ -1037,7 +1079,7 @@ async function startServer() {
           success: false,
           step: "verify-firestore",
           code: checkFsErr?.code || "firestore/verification-failed",
-          error: "No se pudo verificar la eliminación del documento en Firestore.",
+          error: "No se pudo verificar la eliminaciÃ³n del documento en Firestore.",
           details: checkFsErr?.message,
         });
         return;
@@ -1051,7 +1093,7 @@ async function startServer() {
             res.status(500).json({
               success: false,
               step: "verify-storage",
-              error: `Aún existen archivos personales en Storage bajo el prefijo '${prefix}'.`,
+              error: `AÃºn existen archivos personales en Storage bajo el prefijo '${prefix}'.`,
             });
             return;
           }
@@ -1065,7 +1107,7 @@ async function startServer() {
               success: false,
               step: "verify-storage",
               code: stVerifyErr?.code || "storage/verification-failed",
-              error: `Error al verificar la eliminación de archivos en Storage bajo '${prefix}'.`,
+              error: `Error al verificar la eliminaciÃ³n de archivos en Storage bajo '${prefix}'.`,
               details: stVerifyErr?.message,
             });
             return;
@@ -1084,7 +1126,7 @@ async function startServer() {
       console.error("[Account Deletion] Unexpected error:", err);
       res.status(500).json({
         success: false,
-        error: "Ocurrió un error en el servidor al procesar la eliminación de la cuenta.",
+        error: "OcurriÃ³ un error en el servidor al procesar la eliminaciÃ³n de la cuenta.",
         details: err?.message,
       });
     }
@@ -1113,7 +1155,7 @@ async function startServer() {
       if (!bearerToken) {
         res.status(401).json({ 
           success: false, 
-          error: "No autorizado. Token de sesión no proporcionado." 
+          error: "No autorizado. Token de sesiÃ³n no proporcionado." 
         });
         return;
       }
@@ -1126,7 +1168,7 @@ async function startServer() {
         console.error("[Onboarding Cancel] Token verification failed:", verifyErr?.message);
         res.status(401).json({ 
           success: false, 
-          error: "Sesión inválida o expirada." 
+          error: "SesiÃ³n invÃ¡lida o expirada." 
         });
         return;
       }
@@ -1217,7 +1259,7 @@ async function startServer() {
           res.status(500).json({
             success: false,
             step: "verify-auth",
-            error: `El usuario provisional ${uid} aún existe en Firebase Authentication tras la eliminación.`,
+            error: `El usuario provisional ${uid} aÃºn existe en Firebase Authentication tras la eliminaciÃ³n.`,
           });
           return;
         }
@@ -1228,7 +1270,7 @@ async function startServer() {
             success: false,
             step: "verify-auth",
             code: checkErr?.code || "auth/verification-failed",
-            error: "Error al verificar la eliminación del usuario provisional.",
+            error: "Error al verificar la eliminaciÃ³n del usuario provisional.",
             details: checkErr?.message,
           });
           return;
@@ -1245,7 +1287,7 @@ async function startServer() {
       console.error("[Onboarding Cancel] Unexpected error:", err);
       res.status(500).json({
         success: false,
-        error: "Ocurrió un error en el servidor al cancelar el registro provisional.",
+        error: "OcurriÃ³ un error en el servidor al cancelar el registro provisional.",
         details: err?.message,
       });
     }
@@ -1298,7 +1340,7 @@ async function startServer() {
       if (!checkPhoneStatusRateLimit(clientIp)) {
         res.status(429).json({
           success: false,
-          error: "Demasiadas consultas de verificación. Por favor espera un momento antes de reintentar.",
+          error: "Demasiadas consultas de verificaciÃ³n. Por favor espera un momento antes de reintentar.",
         });
         return;
       }
@@ -1311,7 +1353,7 @@ async function startServer() {
       if (!isValid || !digitsOnly || digitsOnly.length !== 10) {
         res.status(400).json({
           success: false,
-          error: "Número de celular no válido. Debe contener 10 dígitos.",
+          error: "NÃºmero de celular no vÃ¡lido. Debe contener 10 dÃ­gitos.",
         });
         return;
       }
@@ -1497,7 +1539,7 @@ async function startServer() {
         if (!token) {
           res.status(401).json({
             success: false,
-            error: "Token de autorización requerido para verificar vinculación de teléfono.",
+            error: "Token de autorizaciÃ³n requerido para verificar vinculaciÃ³n de telÃ©fono.",
           });
           return;
         }
@@ -1509,7 +1551,7 @@ async function startServer() {
         } catch (tokenErr: any) {
           res.status(401).json({
             success: false,
-            error: "Token de autorización no válido o expirado.",
+            error: "Token de autorizaciÃ³n no vÃ¡lido o expirado.",
           });
           return;
         }
@@ -1626,7 +1668,7 @@ async function startServer() {
       console.error("[Phone Status] Unexpected error:", err);
       res.status(500).json({
         success: false,
-        error: "Error interno al verificar el estado del número.",
+        error: "Error interno al verificar el estado del nÃºmero.",
       });
     }
   };
@@ -1638,10 +1680,10 @@ async function startServer() {
   // GENERATE UNIQUE SLUG ENDPOINT (Admin SDK Authority)
   // POST /api/auth/generate-slug
   // =========================================================================
-  app.post("/api/auth/generate-slug", async (req: Request, res: Response) => {
+  app.post("/api/auth/generate-slug", generateSlugRateLimit, async (req: Request, res: Response) => {
     try {
       const { name } = req.body || {};
-      const fullName = typeof name === "string" ? name.trim() : "";
+      const fullName = typeof name === "string" ? name.trim().slice(0, 100) : "";
 
       const base =
         fullName
@@ -1675,7 +1717,7 @@ async function startServer() {
       return res.status(200).json({
         success: true,
         slug: `maestro-${fallbackSuffix}`,
-        warning: "Generado con sufijo único debido a indisponibilidad temporal de consulta.",
+        warning: "Generado con sufijo Ãºnico debido a indisponibilidad temporal de consulta.",
       });
     }
   });
@@ -1697,7 +1739,7 @@ async function startServer() {
       try {
         decodedToken = await adminAuth.verifyIdToken(token);
       } catch (tokenErr: any) {
-        res.status(401).json({ success: false, error: "Token inválido o expirado." });
+        res.status(401).json({ success: false, error: "Token invÃ¡lido o expirado." });
         return;
       }
 
@@ -1707,7 +1749,7 @@ async function startServer() {
       if (!phoneNumber || typeof phoneNumber !== "string" || phoneNumber.trim() === "") {
         res.status(400).json({
           success: false,
-          error: "El usuario no cuenta con un número de teléfono verificado en Firebase Authentication.",
+          error: "El usuario no cuenta con un nÃºmero de telÃ©fono verificado en Firebase Authentication.",
         });
         return;
       }
@@ -1733,7 +1775,7 @@ async function startServer() {
 
       res.status(200).json({
         success: true,
-        message: "Teléfono verificado criptográficamente y registrado con éxito.",
+        message: "TelÃ©fono verificado criptogrÃ¡ficamente y registrado con Ã©xito.",
         phoneNumber,
         verifiedAt: now,
       });
@@ -1741,7 +1783,7 @@ async function startServer() {
       console.error("[Phone Verified Endpoint Error]:", err);
       res.status(500).json({
         success: false,
-        error: err?.message || "Error al registrar la verificación telefónica.",
+        error: err?.message || "Error al registrar la verificaciÃ³n telefÃ³nica.",
       });
     }
   });
@@ -1763,7 +1805,7 @@ async function startServer() {
       try {
         decodedToken = await adminAuth.verifyIdToken(token);
       } catch {
-        res.status(401).json({ success: false, error: "Token inválido o expirado." });
+        res.status(401).json({ success: false, error: "Token invÃ¡lido o expirado." });
         return;
       }
 
@@ -1776,7 +1818,7 @@ async function startServer() {
 
       const { leads } = req.body || {};
       if (!Array.isArray(leads)) {
-        res.status(400).json({ success: false, error: "Formato de leads inválido. Se espera un arreglo." });
+        res.status(400).json({ success: false, error: "Formato de leads invÃ¡lido. Se espera un arreglo." });
         return;
       }
 
@@ -1838,7 +1880,7 @@ async function startServer() {
           const cleanApellidos = (lead.apellidos || lead.lastName || "").trim();
           const cleanOficioPrincipal = (lead.oficioPrincipal || lead.oficio || lead.mainTrade || "Mantenimiento general").trim();
           const cleanServiciosAdicionales = (lead.serviciosAdicionales || (Array.isArray(lead.servicios) ? lead.servicios.join(", ") : "") || "").trim();
-          const cleanCiudad = (lead.ciudad || "Querétaro").trim();
+          const cleanCiudad = (lead.ciudad || "QuerÃ©taro").trim();
           const cleanZonas = (lead.zonas || (Array.isArray(lead.serviceAreas) ? lead.serviceAreas.join(", ") : "") || cleanCiudad).trim();
           const cleanExperiencia = (lead.experiencia || (lead.yearsExperience ? String(lead.yearsExperience) : "") || "").trim();
           const cleanDisponibilidad = (lead.disponibilidad || "").trim();
@@ -1872,7 +1914,7 @@ async function startServer() {
             telefonoWhatsApp: last10,
             bio: cleanServiciosAdicionales
               ? `${cleanOficioPrincipal} en ${cleanCiudad}. ${cleanServiciosAdicionales}`
-              : `Especialista en ${cleanOficioPrincipal} registrado vía ManyChat.`,
+              : `Especialista en ${cleanOficioPrincipal} registrado vÃ­a ManyChat.`,
             serviceAreas: cleanZonas ? cleanZonas.split(/[,;\n/]+/).map((s: string) => s.trim()).filter(Boolean) : [cleanCiudad],
             servicios: cleanServiciosAdicionales ? cleanServiciosAdicionales.split(/[,;\n/]+/).map((s: string) => s.trim()).filter(Boolean) : [],
             yearsExperience: (!isNaN(parsedYears) && parsedYears > 0) ? parsedYears : null,
@@ -1981,7 +2023,7 @@ async function startServer() {
 
       const cleanReason = sanitizeReportText(reason);
       if (cleanReason.length < 10) {
-        return res.status(400).json({ error: "Por favor describe el motivo de tu reporte (mínimo 10 caracteres)." });
+        return res.status(400).json({ error: "Por favor describe el motivo de tu reporte (mÃ­nimo 10 caracteres)." });
       }
 
       // Verify worker exists in Firestore
@@ -2021,7 +2063,7 @@ async function startServer() {
       });
     } catch (err: any) {
       console.error("[Profile Report Error]:", err);
-      return res.status(500).json({ error: "Error al registrar el reporte. Intenta de nuevo más tarde." });
+      return res.status(500).json({ error: "Error al registrar el reporte. Intenta de nuevo mÃ¡s tarde." });
     }
   });
 
@@ -2033,7 +2075,7 @@ async function startServer() {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "No autorizado. Token de sesión requerido." });
+        return res.status(401).json({ error: "No autorizado. Token de sesiÃ³n requerido." });
       }
 
       const token = authHeader.split(" ")[1];
@@ -2049,7 +2091,7 @@ async function startServer() {
         return res.status(400).json({ error: "ID de trabajador requerido." });
       }
       if (action !== "approve" && action !== "reject") {
-        return res.status(400).json({ error: "Acción inválida. Debe ser 'approve' o 'reject'." });
+        return res.status(400).json({ error: "AcciÃ³n invÃ¡lida. Debe ser 'approve' o 'reject'." });
       }
 
       const workerRef = adminDb.collection("maestros").doc(workerId);
@@ -2069,7 +2111,7 @@ async function startServer() {
         // Security check: If a path is specified, it MUST belong strictly to this worker
         if (pendingPath && !pendingPath.startsWith(expectedPrefix)) {
           return res.status(400).json({
-            error: "Ruta de fotografía pendiente inválida.",
+            error: "Ruta de fotografÃ­a pendiente invÃ¡lida.",
           });
         }
 
@@ -2092,7 +2134,7 @@ async function startServer() {
         }
 
         if (!pendingPath || !pendingPath.startsWith(expectedPrefix) || !fileExists || !sourceFile) {
-          return res.status(400).json({ error: "Ruta de fotografía pendiente inválida o no encontrada para este trabajador." });
+          return res.status(400).json({ error: "Ruta de fotografÃ­a pendiente invÃ¡lida o no encontrada para este trabajador." });
         }
 
         const fileName = path.basename(pendingPath);
@@ -2179,7 +2221,7 @@ async function startServer() {
       }
     } catch (err: any) {
       console.error("[Admin Photo Review Error]:", err);
-      return res.status(500).json({ error: err?.message || "Error al procesar la revisión de la fotografía." });
+      return res.status(500).json({ error: err?.message || "Error al procesar la revisiÃ³n de la fotografÃ­a." });
     }
   });
 
@@ -2198,7 +2240,7 @@ async function startServer() {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "No autorizado. Token de sesión requerido." });
+        return res.status(401).json({ error: "No autorizado. Token de sesiÃ³n requerido." });
       }
 
       const token = authHeader.split(" ")[1];
@@ -2206,7 +2248,7 @@ async function startServer() {
       try {
         decodedToken = await adminAuth.verifyIdToken(token);
       } catch {
-        return res.status(401).json({ error: "Token de sesión inválido o expirado." });
+        return res.status(401).json({ error: "Token de sesiÃ³n invÃ¡lido o expirado." });
       }
 
       const workerId = decodedToken.uid;
@@ -2214,7 +2256,7 @@ async function startServer() {
       const expectedPrefix = `profile-photos-pending/${workerId}/`;
 
       if (!pendingStoragePath || typeof pendingStoragePath !== "string" || !pendingStoragePath.startsWith(expectedPrefix)) {
-        return res.status(400).json({ error: "Ruta de fotografía pendiente inválida para este usuario." });
+        return res.status(400).json({ error: "Ruta de fotografÃ­a pendiente invÃ¡lida para este usuario." });
       }
 
       const workerRef = adminDb.collection("maestros").doc(workerId);
@@ -2227,7 +2269,7 @@ async function startServer() {
       const sourceFile = bucket.file(pendingStoragePath);
       const [fileExists] = await sourceFile.exists();
       if (!fileExists) {
-        return res.status(400).json({ error: "La fotografía pendiente no se encontró en Storage." });
+        return res.status(400).json({ error: "La fotografÃ­a pendiente no se encontrÃ³ en Storage." });
       }
 
       // Automated moderation gate (Gemini vision): screens the photo before it can ever
@@ -2242,7 +2284,7 @@ async function startServer() {
             {
               pendingProfilePhotoPath: null,
               profilePhotoReviewStatus: "rejected",
-              rejectNotes: `Rechazo automático (Gemini): ${moderation.reason || "Contenido inapropiado."}`,
+              rejectNotes: `Rechazo automÃ¡tico (Gemini): ${moderation.reason || "Contenido inapropiado."}`,
               reviewedAt: new Date().toISOString(),
               reviewedBy: "gemini_auto_moderation",
             },
@@ -2254,7 +2296,7 @@ async function startServer() {
             updatedAt: new Date().toISOString(),
           });
           return res.status(422).json({
-            error: "Tu fotografía no cumple con nuestras políticas de contenido. Por favor sube otra foto.",
+            error: "Tu fotografÃ­a no cumple con nuestras polÃ­ticas de contenido. Por favor sube otra foto.",
             reason: moderation.reason,
           });
         }
@@ -2300,7 +2342,7 @@ async function startServer() {
       return res.status(200).json({ success: true, publicUrl });
     } catch (err: any) {
       console.error("[Photo Self-Publish Error]:", err);
-      return res.status(500).json({ error: err?.message || "Error al publicar la fotografía de perfil." });
+      return res.status(500).json({ error: err?.message || "Error al publicar la fotografÃ­a de perfil." });
     }
   });
 
@@ -2378,7 +2420,7 @@ async function startServer() {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "No autorizado. Token de sesión no proporcionado." });
+        return res.status(401).json({ error: "No autorizado. Token de sesiÃ³n no proporcionado." });
       }
 
       const token = authHeader.split(" ")[1];
@@ -2386,7 +2428,7 @@ async function startServer() {
       try {
         decodedToken = await adminAuth.verifyIdToken(token);
       } catch (err: any) {
-        return res.status(401).json({ error: "Token de sesión inválido o expirado." });
+        return res.status(401).json({ error: "Token de sesiÃ³n invÃ¡lido o expirado." });
       }
 
       const isUserAdmin = decodedToken.admin === true;
@@ -2456,7 +2498,7 @@ async function startServer() {
       return res.status(200).json({ success: true, authMethods });
     } catch (err: any) {
       console.error("[Admin Auth Methods Error]:", err);
-      return res.status(500).json({ error: err?.message || "Error al obtener métodos de autenticación de los usuarios." });
+      return res.status(500).json({ error: err?.message || "Error al obtener mÃ©todos de autenticaciÃ³n de los usuarios." });
     }
   });
 
