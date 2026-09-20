@@ -719,7 +719,6 @@ async function startServer() {
         telefonoWhatsApp: e164,
         telefonoPublico: e164,
         whatsapp: e164,
-        manychatUserId: manychatUserId || undefined,
         source: "manychat",
         registrationMethod: "manychat_whatsapp",
         status: "active",
@@ -738,6 +737,10 @@ async function startServer() {
         isAvailable: true,
         updatedAt: nowIso,
       };
+
+      if (manychatUserId) {
+        maestroDoc.manychatUserId = manychatUserId;
+      }
 
       if (workPhotoUrls.length > 0) {
         const existingWorkPhotos = Array.isArray(existingData.workPhotos) ? existingData.workPhotos : [];
