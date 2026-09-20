@@ -71,6 +71,70 @@ export const validateVerificationDoc = (file: File, maxMb = 10): UploadValidatio
 };
 
 /**
+ * Downscales and re-compresses a photo client-side before upload. Phone camera
+ * photos routinely come in at 8-15MB / 4000px+ wide, which is fine for local
+ * viewing but painfully slow to upload over mobile data — this brings that
+ * down to a web-appropriate size first. Fails open (returns the original file
+ * untouched) on any decode/canvas error, so a compression hiccup never blocks
+ * an otherwise-valid upload.
+ */
+export const compressImage = (file: File, maxDimension = 1600, quality = 0.82): Promise<File> => {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+      resolve(file);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const { width, height } = img;
+
+      // Already small enough — don't bother re-encoding (and risk quality loss for nothing).
+      if (width <= maxDimension && height <= maxDimension && file.size <= 800 * 1024) {
+        resolve(file);
+        return;
+      }
+
+      const scale = Math.min(1, maxDimension / Math.max(width, height));
+      const targetWidth = Math.round(width * scale);
+      const targetHeight = Math.round(height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+      const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const outputName = outputType === 'image/jpeg' ? file.name.replace(/\.[^/.]+$/, '.jpg') : file.name;
+          const compressed = new File([blob], outputName, { type: outputType, lastModified: Date.now() });
+          resolve(compressed.size < file.size ? compressed : file);
+        },
+        outputType,
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+    img.src = objectUrl;
+  });
+};
+
+/**
  * Upload helper using uploadBytesResumable to ensure resilient uploads on mobile connections.
  */
 const uploadWithResumable = (
@@ -124,8 +188,9 @@ export const uploadWorkerProfileImage = async (
   }
 
   const effectiveUid = await ensureAuthenticatedSession(userId);
+  const uploadFile = await compressImage(file);
 
-  const rawExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const rawExt = (uploadFile.name.split('.').pop() || 'jpg').toLowerCase();
   const ext = rawExt === 'jpeg' || rawExt === 'jpg' ? 'jpg' : rawExt === 'png' ? 'png' : 'webp';
   const fileName = `avatar_${Date.now()}.${ext}`;
   const storagePath = `profile-photos-pending/${effectiveUid}/${fileName}`;
@@ -134,9 +199,9 @@ export const uploadWorkerProfileImage = async (
   try {
     const uploadTask = uploadBytesResumable(
       storageRef,
-      file,
+      uploadFile,
       {
-        contentType: file.type || (ext === 'jpg' ? 'image/jpeg' : `image/${ext}`),
+        contentType: uploadFile.type || (ext === 'jpg' ? 'image/jpeg' : `image/${ext}`),
         customMetadata: {
           uploadedBy: effectiveUid,
           type: 'pendingProfilePhoto',
@@ -200,8 +265,9 @@ export const uploadWorkerWorkPhoto = async (
   }
 
   const effectiveUid = await ensureAuthenticatedSession(userId);
+  const uploadFile = await compressImage(file);
 
-  const rawExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const rawExt = (uploadFile.name.split('.').pop() || 'jpg').toLowerCase();
   const ext = rawExt === 'jpeg' || rawExt === 'jpg' ? 'jpg' : rawExt === 'png' ? 'png' : 'webp';
   const idx = index !== undefined ? `${index}` : Math.random().toString(36).substring(2, 6);
   const fileName = `work_${Date.now()}_${idx}.${ext}`;
@@ -210,9 +276,9 @@ export const uploadWorkerWorkPhoto = async (
   try {
     const downloadUrl = await uploadWithResumable(
       storageRef,
-      file,
+      uploadFile,
       {
-        contentType: file.type || (ext === 'jpg' ? 'image/jpeg' : `image/${ext}`),
+        contentType: uploadFile.type || (ext === 'jpg' ? 'image/jpeg' : `image/${ext}`),
         customMetadata: {
           uploadedBy: effectiveUid,
           type: 'workGallery',
