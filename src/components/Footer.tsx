@@ -127,7 +127,7 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <span className="text-slate-400">
-                  Contacto: <a href="mailto:soporte@maestrocerca.mx" className="text-orange-400 hover:underline">soporte@maestrocerca.mx</a>
+                  Contacto: <a href="mailto:maestrocerca.mx@gmail.com" className="text-orange-400 hover:underline">maestrocerca.mx@gmail.com</a>
                 </span>
               </li>
             </ul>

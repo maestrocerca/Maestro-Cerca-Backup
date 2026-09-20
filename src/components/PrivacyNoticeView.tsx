@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { 
   ShieldCheck, 
   FileText, 
@@ -9,13 +9,12 @@ import {
   MapPin, 
   Clock, 
   UserCheck, 
-  HelpCircle,
-  AlertCircle
+  HelpCircle
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
 export const CURRENT_PRIVACY_NOTICE_VERSION = '1.0';
-export const CURRENT_PRIVACY_NOTICE_DATE = '[FECHA]';
+export const CURRENT_PRIVACY_NOTICE_DATE = '20 de septiembre de 2026';
 
 export const PrivacyNoticeView: React.FC = () => {
   const { navigateTo } = useStore();
@@ -88,7 +87,7 @@ export const PrivacyNoticeView: React.FC = () => {
             </div>
 
             <p>
-              <strong className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-bold">[NOMBRE COMPLETO DEL RESPONSABLE DEL TRATAMIENTO]</strong>, quien actualmente opera el proyecto denominado <strong>Maestro Cerca</strong>, con domicilio para oír y recibir notificaciones en:
+              <strong className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-bold">FRANCISCO HUERTA SÁNCHEZ</strong>, quien actualmente opera el proyecto denominado <strong>Maestro Cerca</strong>, con domicilio para oír y recibir notificaciones en:
             </p>
 
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5 text-xs">
@@ -96,7 +95,7 @@ export const PrivacyNoticeView: React.FC = () => {
                 <Building className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-900">Responsable: </span>
-                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">[NOMBRE COMPLETO DEL RESPONSABLE DEL TRATAMIENTO]</span>
+                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">FRANCISCO HUERTA SÁNCHEZ</span>
                 </div>
               </div>
 
@@ -104,7 +103,7 @@ export const PrivacyNoticeView: React.FC = () => {
                 <MapPin className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-900">Domicilio para notificaciones: </span>
-                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">[DOMICILIO COMPLETO DEL RESPONSABLE]</span>
+                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">FRACCIONAMIENTO ACACIA 10</span>
                 </div>
               </div>
 
@@ -112,7 +111,7 @@ export const PrivacyNoticeView: React.FC = () => {
                 <Mail className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-900">Correo para asuntos de privacidad: </span>
-                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">[CORREO PARA SOLICITUDES DE PRIVACIDAD]</span>
+                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">maestrocerca.mx@gmail.com</span>
                 </div>
               </div>
             </div>
@@ -537,7 +536,7 @@ export const PrivacyNoticeView: React.FC = () => {
               Estas solicitudes podrán enviarse a:
             </p>
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-              <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">[CORREO PARA SOLICITUDES DE PRIVACIDAD]</span>
+              <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">maestrocerca.mx@gmail.com</span>
             </div>
             <p className="text-xs text-slate-600">
               La solicitud deberá identificar suficientemente a la persona titular y describir el uso o divulgación que desea limitar.
@@ -597,7 +596,7 @@ export const PrivacyNoticeView: React.FC = () => {
                 ¿Cómo ejercer estos derechos?
               </h3>
               <p>
-                Envía tu solicitud a: <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">[CORREO PARA SOLICITUDES DE PRIVACIDAD]</span>
+                Envía tu solicitud a: <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">maestrocerca.mx@gmail.com</span>
               </p>
               <p className="font-bold text-slate-900 pt-1">La solicitud deberá contener, según corresponda:</p>
               <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1">
@@ -634,7 +633,7 @@ export const PrivacyNoticeView: React.FC = () => {
               Las solicitudes deberán enviarse a:
             </p>
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-              <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">[CORREO PARA SOLICITUDES DE PRIVACIDAD]</span>
+              <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">maestrocerca.mx@gmail.com</span>
             </div>
             <p className="text-xs text-slate-600">
               La revocación no tendrá efectos retroactivos.
@@ -816,7 +815,7 @@ export const PrivacyNoticeView: React.FC = () => {
                 <Building className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-900">Responsable: </span>
-                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">[NOMBRE COMPLETO DEL RESPONSABLE DEL TRATAMIENTO]</span>
+                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">FRANCISCO HUERTA SÁNCHEZ</span>
                 </div>
               </div>
 
@@ -824,7 +823,7 @@ export const PrivacyNoticeView: React.FC = () => {
                 <Mail className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-900">Correo para solicitudes de privacidad: </span>
-                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">[CORREO PARA SOLICITUDES DE PRIVACIDAD]</span>
+                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">maestrocerca.mx@gmail.com</span>
                 </div>
               </div>
 
@@ -832,7 +831,7 @@ export const PrivacyNoticeView: React.FC = () => {
                 <MapPin className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-900">Domicilio para notificaciones: </span>
-                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">[DOMICILIO COMPLETO DEL RESPONSABLE]</span>
+                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-mono font-medium">FRACCIONAMIENTO ACACIA 10</span>
                 </div>
               </div>
 
@@ -849,14 +848,6 @@ export const PrivacyNoticeView: React.FC = () => {
               </p>
             </div>
           </section>
-
-          {/* Nota final del documento */}
-          <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl flex items-start gap-3 text-xs text-amber-900">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <p className="leading-relaxed">
-              <strong>Nota:</strong> El presente documento corresponde a una propuesta de Aviso de Privacidad para el MVP de Maestro Cerca y deberá ser revisado antes de su publicación definitiva por un profesional jurídico competente, especialmente una vez determinada la identidad formal del responsable del tratamiento.
-            </p>
-          </div>
 
         </div>
 
