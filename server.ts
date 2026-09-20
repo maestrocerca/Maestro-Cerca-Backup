@@ -10,6 +10,8 @@ import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import { getStorage as getAdminStorage } from "firebase-admin/storage";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
+import dns from "dns";
+import net from "net";
 
 // Load Firebase configuration
 const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -217,6 +219,50 @@ async function generateUniqueSlugServer(fullName: string): Promise<string> {
 }
 
 /**
+ * Blocks SSRF: rejects URLs whose hostname resolves to a private/loopback/link-local
+ * address, so a malicious foto_url can't make the server fetch internal network
+ * resources (e.g. cloud metadata endpoints) even if the webhook secret ever leaks.
+ */
+function isPrivateOrLoopbackIp(ip: string): boolean {
+  if (net.isIPv4(ip)) {
+    const parts = ip.split(".").map(Number);
+    const [a, b] = parts;
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 0) return true;
+    return false;
+  }
+  if (net.isIPv6(ip)) {
+    const normalized = ip.toLowerCase();
+    if (normalized === "::1") return true;
+    if (normalized.startsWith("fe80:")) return true; // link-local
+    if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true; // unique local
+    if (normalized.startsWith("::ffff:")) {
+      const v4 = normalized.split(":").pop() || "";
+      return net.isIPv4(v4) && isPrivateOrLoopbackIp(v4);
+    }
+    return false;
+  }
+  return true; // unknown format: treat as unsafe
+}
+
+async function assertPublicHttpUrl(rawUrl: string): Promise<void> {
+  const parsed = new URL(rawUrl);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("URL scheme not allowed");
+  }
+  const addresses = await dns.promises.lookup(parsed.hostname, { all: true });
+  for (const { address } of addresses) {
+    if (isPrivateOrLoopbackIp(address)) {
+      throw new Error("URL resolves to a private/internal address");
+    }
+  }
+}
+
+/**
  * Copies an external image from URL (e.g. ManyChat / WhatsApp CDN) to Firebase Storage.
  * If copy fails or bucket is not provisioned, falls back gracefully to the original URL so data is never lost.
  */
@@ -228,6 +274,13 @@ async function copyImageToFirebaseStorage(
   try {
     if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
       return { url: imageUrl || "", copied: false, error: "Invalid URL" };
+    }
+
+    try {
+      await assertPublicHttpUrl(imageUrl);
+    } catch (ssrfErr: any) {
+      console.error("[SSRF Guard] Blocked fetch of unsafe URL:", ssrfErr?.message);
+      return { url: "", copied: false, error: "Blocked: unsafe URL" };
     }
 
     const controller = new AbortController();
@@ -673,6 +726,7 @@ async function startServer() {
       const workPhotoUrls: string[] = [];
       for (const fotoUrl of fotoUrls) {
         try {
+          await assertPublicHttpUrl(fotoUrl);
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 8000);
           const imgRes = await fetch(fotoUrl, { signal: controller.signal });
