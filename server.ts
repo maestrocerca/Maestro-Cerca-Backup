@@ -13,6 +13,7 @@ import fs from "fs";
 import dns from "dns";
 import net from "net";
 import crypto from "crypto";
+import { DESIGNATED_ADMIN_EMAILS } from "./src/config/admins";
 
 // Load Firebase configuration
 const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -2317,6 +2318,60 @@ async function startServer() {
     } catch (err: any) {
       console.error("[Wipe Test Data] Error:", err);
       res.status(500).json({ success: false, error: err?.message || "Error al borrar los datos de prueba." });
+    }
+  });
+
+  // =========================================================================
+  // ONE-TIME ADMIN CLAIMS BOOTSTRAP
+  // POST /api/admin/bootstrap-claims
+  // The Firestore rules and every /api/admin/* endpoint strictly require the
+  // Firebase custom claim `admin: true` on the caller's ID token — nothing
+  // ever falls back to checking the DESIGNATED_ADMIN_EMAILS list server-side.
+  // Since only an existing admin can normally grant that claim (via the
+  // Admin SDK), the very first admin has no way to get in. This endpoint
+  // breaks that deadlock: given the shared secret ADMIN_BOOTSTRAP_SECRET (set
+  // only in deployment env vars, never in the repo), it sets `admin: true` on
+  // every Firebase Auth user whose email is in DESIGNATED_ADMIN_EMAILS.
+  // Each designated admin must have signed in at least once (so their Auth
+  // user exists) before this can grant them the claim; after running it,
+  // they must sign out and back in for the new claim to appear in their ID
+  // token. Safe to leave deployed (it can never grant claims to an email
+  // outside the fixed designated list), but remove once no longer needed.
+  // =========================================================================
+  app.post("/api/admin/bootstrap-claims", async (req: Request, res: Response) => {
+    try {
+      const expectedSecret = process.env.ADMIN_BOOTSTRAP_SECRET;
+      if (!expectedSecret || expectedSecret.trim() === "") {
+        res.status(503).json({ success: false, error: "Servicio no configurado: falta ADMIN_BOOTSTRAP_SECRET." });
+        return;
+      }
+
+      const rawHeaderKey = req.get("x-api-key") || (req.headers["x-api-key"] as string | undefined);
+      const apiKey = Array.isArray(rawHeaderKey) ? rawHeaderKey[0] : rawHeaderKey;
+      if (!apiKey || !secretsMatch(apiKey, expectedSecret)) {
+        res.status(401).json({ success: false, error: "Unauthorized" });
+        return;
+      }
+
+      const results: Array<{ email: string; status: string }> = [];
+      for (const email of DESIGNATED_ADMIN_EMAILS) {
+        try {
+          const userRecord = await adminAuth.getUserByEmail(email);
+          await adminAuth.setCustomUserClaims(userRecord.uid, { ...userRecord.customClaims, admin: true });
+          results.push({ email, status: "admin claim asignado" });
+        } catch (err: any) {
+          if (err?.code === "auth/user-not-found") {
+            results.push({ email, status: "sin cuenta de Firebase aún (debe iniciar sesión al menos una vez primero)" });
+          } else {
+            results.push({ email, status: `error: ${err?.message || "desconocido"}` });
+          }
+        }
+      }
+
+      res.status(200).json({ success: true, results });
+    } catch (err: any) {
+      console.error("[Admin Bootstrap Claims] Error:", err);
+      res.status(500).json({ success: false, error: err?.message || "Error al asignar permisos administrativos." });
     }
   });
 
