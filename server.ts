@@ -1416,7 +1416,7 @@ async function startServer() {
       } catch (lookupErr: any) {
         if (lookupErr?.code === "auth/user-not-found") {
           await logAccountActionAudit({ action, callerIp, whatsappE164: e164, success: true, message: "No account exists for this phone" });
-          res.status(200).json({ success: true, exists: false });
+          res.status(200).json({ success: true, exists: false, nombre: "", oficio: "", ciudad: "", pausado: false, slug: "" });
           return;
         }
         throw lookupErr;
@@ -1428,7 +1428,7 @@ async function startServer() {
 
       if (!workerSnap.exists) {
         await logAccountActionAudit({ action, callerIp, whatsappE164: e164, targetUid: uid, success: true, message: "Auth user exists but no worker profile" });
-        res.status(200).json({ success: true, exists: false });
+        res.status(200).json({ success: true, exists: false, nombre: "", oficio: "", ciudad: "", pausado: false, slug: "" });
         return;
       }
 
