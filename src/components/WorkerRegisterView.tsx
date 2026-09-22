@@ -19,10 +19,11 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { ConfirmationResult } from 'firebase/auth';
-import { 
-  useStore, 
-  formatMexicanPhoneToE164, 
-  formatPhoneForDisplay 
+import { cleanMexicanPhoneInput } from '../lib/whatsapp';
+import {
+  useStore,
+  formatMexicanPhoneToE164,
+  formatPhoneForDisplay
 } from '../context/StoreContext';
 import { Worker, WorkPhoto } from '../types';
 import { auth } from '../lib/firebase';
@@ -234,7 +235,7 @@ export const WorkerRegisterView: React.FC = () => {
     'Aluminiero y vidriero': ['Cancelería de aluminio', 'Ventanas y puertas de cristal templado', 'Cancel de baño', 'Mosquiteros y domos'],
   };
 
-  const clean10Digits = rawPhone.replace(/\D/g, '').slice(0, 10);
+  const clean10Digits = cleanMexicanPhoneInput(rawPhone);
 
   // =========================================================================
   // STEP 1 HANDLERS: Phone SMS, Facebook
@@ -1052,7 +1053,7 @@ export const WorkerRegisterView: React.FC = () => {
                       placeholder="442 123 4567"
                       value={rawPhone}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        const val = cleanMexicanPhoneInput(e.target.value);
                         setRawPhone(val);
                       }}
                       className="w-full p-3.5 bg-transparent text-slate-900 text-base font-bold tracking-wider placeholder:text-slate-400 placeholder:font-normal focus:outline-hidden"
@@ -1315,7 +1316,7 @@ export const WorkerRegisterView: React.FC = () => {
                           placeholder="442 123 4567"
                           value={rawPhone}
                           onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            const val = cleanMexicanPhoneInput(e.target.value);
                             setRawPhone(val);
                             if (linkSubStep === 'code') setLinkSubStep('idle');
                           }}

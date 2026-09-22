@@ -4,6 +4,26 @@
  */
 
 /**
+ * Cleans a raw phone input typed/pasted into a "10-digit only" field (one that
+ * already shows a fixed +52 prefix outside the input). Handles the common case
+ * of a user pasting their number WITH the country code included (e.g. copied
+ * from WhatsApp as "521 442 123 4567" or "52 442 123 4567") by stripping a
+ * redundant leading 52/521 prefix before truncating â€” a naive
+ * `.replace(/\D/g, '').slice(0, 10)` would instead keep the first 10 digits of
+ * the country code + area code, silently producing a fabricated, wrong number.
+ */
+export function cleanMexicanPhoneInput(rawValue: string): string {
+  const digits = rawValue.replace(/\D/g, '');
+  if (digits.length > 10 && digits.startsWith('521')) {
+    return digits.slice(3, 13);
+  }
+  if (digits.length > 10 && digits.startsWith('52')) {
+    return digits.slice(2, 12);
+  }
+  return digits.slice(0, 10);
+}
+
+/**
  * Sanitizes any raw phone input to standard international Mexican format (+52...)
  * Strips whitespace, dashes, parentheses and non-digit characters.
  */

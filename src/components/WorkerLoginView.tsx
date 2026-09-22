@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { ConfirmationResult } from 'firebase/auth';
 import { useStore, formatMexicanPhoneToE164, formatPhoneForDisplay } from '../context/StoreContext';
+import { cleanMexicanPhoneInput } from '../lib/whatsapp';
 import { FACEBOOK_AUTH_ENABLED } from '../config/featureFlags';
 import loginHeaderImage from '../assets/images/regenerated_image_1789689228307.png';
 
@@ -69,7 +70,7 @@ export const WorkerLoginView: React.FC = () => {
   }, [cooldown]);
 
   // Clean 10 digits only
-  const cleanPhoneDigits = rawPhone.replace(/\D/g, '').slice(0, 10);
+  const cleanPhoneDigits = cleanMexicanPhoneInput(rawPhone);
 
   const handleFacebookSignIn = async () => {
     setError('');
@@ -308,7 +309,7 @@ export const WorkerLoginView: React.FC = () => {
                       placeholder="442 123 4567"
                       value={rawPhone}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        const val = cleanMexicanPhoneInput(e.target.value);
                         setRawPhone(val);
                         if (nonExistentAccount) setNonExistentAccount(false);
                         if (error) setError('');

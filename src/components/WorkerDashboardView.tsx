@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { ConfirmationResult } from 'firebase/auth';
 import { useStore } from '../context/StoreContext';
+import { cleanMexicanPhoneInput } from '../lib/whatsapp';
 import { FACEBOOK_AUTH_ENABLED } from '../config/featureFlags';
 import { WorkPhoto } from '../types';
 import { WorkerAvatar } from './WorkerAvatar';
@@ -423,7 +424,7 @@ export const WorkerDashboardView: React.FC = () => {
     if (e) e.preventDefault();
     setLinkingError('');
     setLinkingSuccess('');
-    const clean = linkPhoneDigits.replace(/\D/g, '').slice(0, 10);
+    const clean = cleanMexicanPhoneInput(linkPhoneDigits);
     if (clean.length !== 10) {
       setLinkingError('Por favor ingresa los 10 dígitos de tu número celular.');
       return;
@@ -509,7 +510,7 @@ export const WorkerDashboardView: React.FC = () => {
       const res = await confirmPhoneLinkCode(linkConfirmationResult, clean);
       if (res.success) {
         setLinkingSuccess('Número celular vinculado exitosamente a tu cuenta.');
-        const cleanDigits = linkPhoneDigits.replace(/\D/g, '').slice(0, 10);
+        const cleanDigits = cleanMexicanPhoneInput(linkPhoneDigits);
         if (cleanDigits) {
           setFormData((prev) => ({
             ...prev,
@@ -1725,9 +1726,8 @@ export const WorkerDashboardView: React.FC = () => {
                                 <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">+52</span>
                                 <input
                                   type="tel"
-                                  maxLength={10}
                                   value={linkPhoneDigits}
-                                  onChange={(e) => setLinkPhoneDigits(e.target.value.replace(/\D/g, ''))}
+                                  onChange={(e) => setLinkPhoneDigits(cleanMexicanPhoneInput(e.target.value))}
                                   placeholder="10 dígitos cel"
                                   className="w-full pl-10 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium"
                                 />
