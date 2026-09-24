@@ -137,13 +137,12 @@ export const Navbar: React.FC = () => {
             {currentWorker && (
               <button
                 onClick={() => navigateTo({ type: 'dashboard' })}
-                className="p-1 bg-orange-50 rounded-lg border border-orange-200"
               >
                 <WorkerAvatar
                   worker={currentWorker}
                   alt={currentWorker.firstName}
                   size="custom"
-                  className="w-7 h-7 !rounded-full !border-orange-300 shadow-none"
+                  className="w-11 h-11 !rounded-full !border-orange-300 shadow-none"
                   imgClassName="rounded-full"
                 />
               </button>

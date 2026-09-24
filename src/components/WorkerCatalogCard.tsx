@@ -92,10 +92,10 @@ export const WorkerCatalogCard: React.FC<WorkerCatalogCardProps> = ({ worker, on
 
       {/* Info block */}
       <div className="p-4 sm:p-5 space-y-2.5 flex-1 flex flex-col">
-        <p className="text-orange-600 font-bold text-sm">
-          {oficio}
+        <p className="font-black text-lg sm:text-xl leading-snug">
+          <span className="text-orange-600">{oficio}</span>
           {typeof worker.yearsExperience === 'number' && worker.yearsExperience > 0 && (
-            <span className="text-slate-500 font-semibold"> · {worker.yearsExperience} años de experiencia</span>
+            <span className="text-slate-700"> · {worker.yearsExperience} años de experiencia</span>
           )}
         </p>
 

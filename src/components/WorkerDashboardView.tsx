@@ -44,6 +44,12 @@ import {
   validateVerificationDoc 
 } from '../lib/storage';
 
+const WhatsAppGlyph: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.39 1.26 4.81L2 22l5.41-1.42a9.87 9.87 0 0 0 4.63 1.18h.01c5.46 0 9.9-4.45 9.9-9.91C21.96 6.45 17.5 2 12.04 2zm5.81 14.14c-.25.7-1.46 1.34-2.02 1.42-.52.08-1.18.11-1.9-.12-.44-.14-1-.32-1.72-.62-3.03-1.31-5.01-4.36-5.16-4.56-.15-.2-1.23-1.64-1.23-3.12 0-1.49.78-2.22 1.06-2.52.28-.3.6-.37.8-.37.2 0 .4 0 .58.01.19.01.44-.07.68.52.25.6.86 2.08.93 2.23.07.15.12.33.02.53-.1.2-.15.32-.3.5-.15.18-.31.4-.44.53-.15.15-.3.31-.13.6.17.3.75 1.24 1.62 2.01 1.11.99 2.05 1.3 2.34 1.45.29.15.46.13.63-.08.17-.2.72-.84.92-1.13.2-.29.4-.24.66-.14.27.1 1.72.81 2.02.96.29.15.49.22.56.35.07.13.07.75-.18 1.45z" />
+  </svg>
+);
+
 export const WorkerDashboardView: React.FC = () => {
   const { 
     currentWorker, 
@@ -781,35 +787,29 @@ export const WorkerDashboardView: React.FC = () => {
         
         {/* One-time ManyChat / WhatsApp claimed profile notification */}
         {showManyChatBanner && (
-          <div 
+          <div
             id="manychat-claimed-banner"
-            className="bg-emerald-50 border border-emerald-200 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-start justify-between gap-4 animate-in fade-in duration-300"
+            className="relative bg-emerald-50 border border-emerald-200 rounded-3xl p-4 sm:p-5 shadow-xs flex items-center gap-4 animate-in fade-in duration-300"
           >
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <MessageCircle className="w-5 h-5" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="text-base font-bold text-emerald-950">¡Bienvenido a Maestro Cerca!</h4>
-                  <span className="text-[11px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    Registro WhatsApp
-                  </span>
-                </div>
-                <p className="text-sm text-emerald-900 leading-relaxed font-medium">
-                  Ya agregamos la información que nos compartiste por WhatsApp. Revisa y completa tu perfil para que los clientes puedan conocerte mejor.
-                </p>
-              </div>
+            <button
+              onClick={handleDismissManyChatBanner}
+              className="absolute top-3 right-3 p-1.5 text-emerald-700/50 hover:text-emerald-900 hover:bg-emerald-100 rounded-lg transition-colors"
+              aria-label="Cerrar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-12 h-12 rounded-2xl bg-[#25D366] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <WhatsAppGlyph className="w-7 h-7" />
             </div>
+            <h4 className="flex-1 pr-6 text-base sm:text-lg font-black text-emerald-950 leading-tight">
+              Registro de WhatsApp completado
+            </h4>
             <button
               id="dismiss-manychat-banner-btn"
               onClick={handleDismissManyChatBanner}
-              className="self-end sm:self-start inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 hover:text-emerald-950 hover:bg-emerald-100/80 rounded-xl transition-colors shrink-0"
-              aria-label="Cerrar aviso de WhatsApp"
-              title="Entendido"
+              className="shrink-0 px-4 sm:px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-black rounded-xl shadow-xs transition-colors"
             >
-              <span>Entendido</span>
-              <X className="w-4 h-4" />
+              Entendido
             </button>
           </div>
         )}
@@ -898,16 +898,16 @@ export const WorkerDashboardView: React.FC = () => {
         )}
 
         {/* Header Profile Card */}
-        <div id="section-profile-header" className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
-            {/* Interactive Avatar Component */}
-            <div className="relative group shrink-0">
+        <div id="section-profile-header" className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+          {/* Identity block: photo is the dominant visual element */}
+          <div className="p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-6">
+            <div className="relative group shrink-0 mx-auto sm:mx-0">
               <WorkerAvatar
                 worker={currentWorker}
                 allowPendingPreview={true}
                 previewUrl={pendingPhotoPreviewUrl}
                 alt={`${currentWorker.firstName} ${currentWorker.lastName}`}
-                size="md"
+                size="lg"
                 imgClassName="transition-transform duration-300 group-hover:scale-105"
               >
                 {/* Uploading indicator overlay */}
@@ -920,12 +920,12 @@ export const WorkerDashboardView: React.FC = () => {
 
                 {/* Desktop hover overlay */}
                 {!isUploadingProfilePhoto && (
-                  <label 
+                  <label
                     className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer p-1 text-center z-10"
                     title="Cambiar foto de perfil (JPG, PNG, WebP máx. 5MB)"
                   >
-                    <Camera className="w-5 h-5 mb-0.5" />
-                    <span className="text-[10px] font-bold leading-tight">Cambiar foto</span>
+                    <Camera className="w-6 h-6 mb-0.5" />
+                    <span className="text-xs font-bold leading-tight">Cambiar foto</span>
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
@@ -938,11 +938,11 @@ export const WorkerDashboardView: React.FC = () => {
               </WorkerAvatar>
 
               {/* Accessible Camera badge on bottom-right corner */}
-              <label 
-                className="absolute -bottom-1.5 -right-1.5 p-2 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white rounded-xl shadow-md cursor-pointer transition-all hover:scale-110 active:scale-95 z-20 flex items-center justify-center"
+              <label
+                className="absolute -bottom-1.5 -right-1.5 p-2.5 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] text-white rounded-xl shadow-md cursor-pointer transition-all hover:scale-110 active:scale-95 z-20 flex items-center justify-center"
                 title="Cambiar foto de perfil (JPG, PNG, WebP máx. 5MB)"
               >
-                <Camera className="w-3.5 h-3.5" />
+                <Camera className="w-4 h-4" />
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
@@ -953,135 +953,146 @@ export const WorkerDashboardView: React.FC = () => {
               </label>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-2">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
+            <div className="flex-1 space-y-2 text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-2 justify-center sm:justify-start">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
                   {currentWorker.firstName} {currentWorker.lastName}
                 </h1>
-                <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border font-black text-xs sm:text-sm tracking-wide uppercase shadow-xs w-fit ${
+                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border font-black text-[11px] sm:text-xs tracking-wide uppercase shadow-xs w-fit mx-auto sm:mx-0 ${
                   isVerified
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                     : 'bg-slate-100 text-slate-800 border-slate-300'
                 }`}>
-                  <span className="text-[10px] sm:text-xs font-bold text-slate-500 tracking-normal normal-case">
-                    ESTATUS ACTUAL:
+                  {isVerified ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>VERIFICADO</span>
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span>REGISTRADO</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-lg sm:text-xl font-black text-[#FF6B00]">{currentWorker.mainTrade}</p>
+
+              <p className="text-sm text-slate-500 flex items-center justify-center sm:justify-start gap-1.5">
+                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>{currentWorker.serviceAreas.join(', ')}</span>
+              </p>
+
+              {currentWorker.profilePhotoReviewStatus && (
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  {currentWorker.profilePhotoReviewStatus === 'pending' && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold">
+                      <Clock className="w-3 h-3 text-amber-700" />
+                      Foto en moderación
+                    </span>
+                  )}
+                  {currentWorker.profilePhotoReviewStatus === 'approved' && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 text-xs font-bold">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                      Foto pública aprobada
+                    </span>
+                  )}
+                  {currentWorker.profilePhotoReviewStatus === 'rejected' && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-200 text-xs font-bold">
+                      <AlertCircle className="w-3 h-3 text-rose-700" />
+                      Foto rechazada (sube otra)
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={() => navigateTo({ type: 'profile', workerSlug: currentWorker.slug })}
+                className="mt-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-xl transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Ver perfil público</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100" />
+
+          {/* Disponibilidad */}
+          <div
+            id="worker-availability-card"
+            className={`px-6 sm:px-8 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+              isAvailable ? 'bg-emerald-50/40' : 'bg-amber-50/40'
+            }`}
+          >
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className={`w-3 h-3 rounded-full mt-1 sm:mt-0 shrink-0 ${isAvailable ? 'bg-emerald-500 shadow-xs' : 'bg-amber-500'}`} />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm sm:text-base font-black text-slate-900">
+                    {isAvailable ? 'Disponible para nuevos trabajos' : 'Tu disponibilidad está pausada'}
                   </span>
-                  <span className="flex items-center gap-1.5 font-black">
-                    {isVerified ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>VERIFICADO</span>
-                      </>
-                    ) : (
-                      <>
-                        <Shield className="w-4 h-4 text-slate-500 shrink-0" />
-                        <span>REGISTRADO</span>
-                      </>
-                    )}
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                    isAvailable ? 'bg-emerald-200/80 text-emerald-900' : 'bg-amber-200 text-amber-900'
+                  }`}>
+                    {isAvailable ? 'Activo' : 'Oculto'}
                   </span>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2.5">
-                <p className="text-sm sm:text-base font-bold text-[#FF6B00]">{currentWorker.mainTrade}</p>
-                {currentWorker.profilePhotoReviewStatus === 'pending' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold">
-                    <Clock className="w-3 h-3 text-amber-700" />
-                    Foto en moderación (se mostrará al aprobarse)
-                  </span>
-                )}
-                {currentWorker.profilePhotoReviewStatus === 'approved' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 text-xs font-bold">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-700" />
-                    Foto pública aprobada
-                  </span>
-                )}
-                {currentWorker.profilePhotoReviewStatus === 'rejected' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-200 text-xs font-bold">
-                    <AlertCircle className="w-3 h-3 text-rose-700" />
-                    Foto rechazada (sube otra)
-                  </span>
-                )}
-              </div>
-              <p className="text-xs sm:text-sm text-slate-500 flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span>{currentWorker.serviceAreas.join(', ')}</span>
-              </p>
+            </div>
+
+            <div className="w-full sm:w-auto shrink-0">
+              {isAvailable ? (
+                <button
+                  type="button"
+                  id="pause-availability-btn"
+                  onClick={() => setShowAvailabilityModal(true)}
+                  className="w-full sm:w-auto py-3 px-5 bg-white hover:bg-slate-100 active:scale-[0.99] border border-slate-300 text-slate-700 hover:text-slate-900 font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <PauseCircle className="w-4 h-4 text-slate-500" />
+                  <span>Pausar mi disponibilidad</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  id="resume-availability-btn"
+                  disabled={isTogglingAvailability}
+                  onClick={handleToggleAvailability}
+                  className="w-full sm:w-auto py-3 px-6 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isTogglingAvailability ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Activando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PlayCircle className="w-4 h-4" />
+                      <span>Volver a estar disponible</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => navigateTo({ type: 'profile', workerSlug: currentWorker.slug })}
-              className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>Ver perfil público</span>
-            </button>
-          </div>
-        </div>
+          <div className="border-t border-slate-100" />
 
-        {/* BOTÓN GRANDE Y BANNER DE DISPONIBILIDAD */}
-        <div 
-          id="worker-availability-card"
-          className={`p-5 rounded-3xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-            isAvailable 
-              ? 'bg-emerald-50/70 border-emerald-200' 
-              : 'bg-amber-50 border-amber-300'
-          }`}
-        >
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div className={`w-3.5 h-3.5 rounded-full mt-1 sm:mt-0 shrink-0 ${isAvailable ? 'bg-emerald-500 shadow-xs' : 'bg-amber-500'}`} />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm sm:text-base font-black text-slate-900">
-                  {isAvailable ? 'Disponible para nuevos trabajos' : 'Tu disponibilidad está pausada'}
-                </span>
-                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
-                  isAvailable ? 'bg-emerald-200/80 text-emerald-900' : 'bg-amber-200 text-amber-900'
-                }`}>
-                  {isAvailable ? 'Activo en búsquedas' : 'Oculto en búsquedas'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 mt-0.5 max-w-xl">
-                {isAvailable 
-                  ? 'Los clientes en Querétaro pueden encontrar tu perfil y contactarte directamente por WhatsApp o llamada.' 
-                  : 'Tu perfil dejará temporalmente de aparecer como disponible para nuevos clientes. Podrás volver a activarlo cuando quieras.'}
-              </p>
+          {/* Completitud */}
+          <div className="px-6 sm:px-8 py-5 space-y-2">
+            <div className="flex justify-between items-center text-xs font-bold">
+              <span className="text-slate-700">Completitud de tu perfil</span>
+              <span className="text-[#FF6B00]">{completionScore}%</span>
             </div>
-          </div>
-
-          <div className="w-full sm:w-auto shrink-0">
-            {isAvailable ? (
-              <button
-                type="button"
-                id="pause-availability-btn"
-                onClick={() => setShowAvailabilityModal(true)}
-                className="w-full sm:w-auto py-3 px-5 bg-white hover:bg-slate-100 active:scale-[0.99] border border-slate-300 text-slate-700 hover:text-slate-900 font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <PauseCircle className="w-4 h-4 text-slate-500" />
-                <span>Pausar mi disponibilidad</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                id="resume-availability-btn"
-                disabled={isTogglingAvailability}
-                onClick={handleToggleAvailability}
-                className="w-full sm:w-auto py-3 px-6 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {isTogglingAvailability ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Activando...</span>
-                  </>
-                ) : (
-                  <>
-                    <PlayCircle className="w-4 h-4" />
-                    <span>Volver a estar disponible</span>
-                  </>
-                )}
-              </button>
-            )}
+            <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  completionScore >= 80 ? 'bg-green-500' : completionScore >= 50 ? 'bg-orange-500' : 'bg-amber-400'
+                }`}
+                style={{ width: `${completionScore}%` }}
+              />
+            </div>
           </div>
         </div>
 
@@ -1092,7 +1103,7 @@ export const WorkerDashboardView: React.FC = () => {
               <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center mx-auto">
                 <PauseCircle className="w-6 h-6" />
               </div>
-              
+
               <div className="text-center space-y-2">
                 <h3 className="text-lg font-black text-slate-900">
                   ¿Pausar tu disponibilidad?
@@ -1145,27 +1156,6 @@ export const WorkerDashboardView: React.FC = () => {
             <span>{saveError}</span>
           </div>
         )}
-
-        {/* Completion Bar */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-2">
-          <div className="flex justify-between items-center text-xs font-bold">
-            <span className="text-slate-700">Completitud de tu perfil</span>
-            <span className="text-[#FF6B00]">{completionScore}%</span>
-          </div>
-          <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                completionScore >= 80 ? 'bg-green-500' : completionScore >= 50 ? 'bg-orange-500' : 'bg-amber-400'
-              }`}
-              style={{ width: `${completionScore}%` }}
-            />
-          </div>
-          {completionScore < 100 && (
-            <p className="text-[11px] text-slate-500">
-              💡 Tip: Agrega más fotografías de tus trabajos y describe detalladamente tus servicios para alcanzar el 100%.
-            </p>
-          )}
-        </div>
 
         {/* Navigation Tabs (3 tabs strictly) */}
         <div className="flex overflow-x-auto gap-2 border-b border-slate-200 pb-2">
@@ -1473,13 +1463,14 @@ export const WorkerDashboardView: React.FC = () => {
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Oficio principal</label>
                   <select
-                    value={formData.mainTrade}
+                    value={trades.some((t) => t.name === formData.mainTrade) || !formData.mainTrade ? formData.mainTrade : 'Otro'}
                     onChange={(e) => setFormData({ ...formData, mainTrade: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold"
                   >
                     {trades.map((t) => (
                       <option key={t.id} value={t.name}>{t.name}</option>
                     ))}
+                    <option value="Otro">Otro</option>
                   </select>
                 </div>
                 <div>
