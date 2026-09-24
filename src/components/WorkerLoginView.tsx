@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Phone, 
   ArrowRight, 
@@ -11,7 +11,6 @@ import { ConfirmationResult } from 'firebase/auth';
 import { useStore, formatMexicanPhoneToE164, formatPhoneForDisplay } from '../context/StoreContext';
 import { cleanMexicanPhoneInput } from '../lib/whatsapp';
 import { FACEBOOK_AUTH_ENABLED } from '../config/featureFlags';
-import loginHeaderImage from '../assets/images/regenerated_image_1789689228307.png';
 
 const FacebookIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5 shrink-0" }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -235,24 +234,6 @@ export const WorkerLoginView: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#FAF8F5] py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
       <div className="max-w-md w-full space-y-8">
-
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto shadow-xs overflow-hidden">
-            <img
-              src={loginHeaderImage}
-              alt="Maestro Cerca"
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-[#0C2340] tracking-tight">
-            Acceso para trabajadores
-          </h1>
-          <p className="text-slate-600 text-sm">
-            Entra a tu cuenta con cualquiera de los métodos que tengas vinculados.
-          </p>
-        </div>
-
         {/* Main Card */}
         <div key={step} className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6 animate-fadeIn">
           
