@@ -31,12 +31,12 @@ export interface VerificationRequest {
  * Collections needed: `maestros`
  * Fields: { id, nombre, oficio, bio, calificacion, radioKm, lat, lng, fotoUrl, telefonoWhatsApp, nivel, verificado, aprobado, fechaRegistro, ... }
  */
-// Default fallback avatar URL (blank to favor neutral vector worker avatar component)
-export const DEFAULT_AVATAR_URL = '';
+// Default fallback avatar URL for workers without custom approved photo
+export const DEFAULT_AVATAR_URL = '/images/default-avatar.png';
 
 /**
  * Returns the valid photo URL for a worker, strictly adhering to the public moderation rules:
- * - If profilePhotoReviewStatus is NOT 'approved', it returns empty string so the neutral vector worker avatar is used.
+ * - If profilePhotoReviewStatus is NOT 'approved', it returns the generic default worker avatar image.
  * - Authenticated owners/admins can pass allowPendingPreview: true with an in-memory/authenticated previewUrl.
  */
 export const getWorkerAvatarSrc = (
@@ -50,16 +50,16 @@ export const getWorkerAvatarSrc = (
   } | null,
   options?: { allowPendingPreview?: boolean; previewUrl?: string | null }
 ): string => {
-  if (!worker) return '';
+  if (!worker) return DEFAULT_AVATAR_URL;
   if (options?.allowPendingPreview && options?.previewUrl) {
     return options.previewUrl;
   }
   // Public privacy rule: ONLY display real photo if officially approved by admin
   if (worker.profilePhotoReviewStatus !== 'approved') {
-    return '';
+    return DEFAULT_AVATAR_URL;
   }
   const raw = worker.profilePhoto?.trim() || worker.fotoUrl?.trim() || worker.photoUrl?.trim();
-  return raw || '';
+  return raw || DEFAULT_AVATAR_URL;
 };
 
 export interface ProfileReport {
