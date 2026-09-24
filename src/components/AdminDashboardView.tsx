@@ -27,23 +27,16 @@ import {
   Building2,
   LogOut,
   ChevronRight,
-  FileSpreadsheet,
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
 
-const FacebookIcon: React.FC<{ className?: string }> = ({ className = "w-3 h-3 shrink-0" }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-  </svg>
-);
 import { useStore, DESIGNATED_ADMIN_EMAILS } from '../context/StoreContext';
 import { WorkerAvatar } from './WorkerAvatar';
-import { Maestro, Worker, Trade, ServiceArea, VerificationStatus, ProfileStatus, AdminAuthMethodInfo } from '../types';
+import { Maestro, Worker, Trade, ServiceArea, VerificationStatus, ProfileStatus } from '../types';
 import { sanitizeMexicanPhone } from '../lib/whatsapp';
 import { AdminGuard } from './AdminGuard';
 import { getSecureTransientBlobUrl, listWorkerVerificationDocs } from '../lib/storage';
-import { ManyChatImporter } from './ManyChatImporter';
 
 export const AdminDashboardView: React.FC = () => {
   const { 
@@ -58,10 +51,8 @@ export const AdminDashboardView: React.FC = () => {
     adminSetVerificationStatus, 
     adminApproveMaestro,
     adminSetProfileStatus,
-    adminFetchAuthMethods,
     adminVerifyMaestro,
     adminUpdateMaestroTier,
-    importManyChatLeads,
     adminDeleteMaestro,
     adminAddTrade, 
     adminToggleTrade, 
@@ -81,21 +72,8 @@ export const AdminDashboardView: React.FC = () => {
     contactarWhatsApp
   } = useStore();
 
-  // Real Firebase Auth linked methods cache
-  const [authMethodsMap, setAuthMethodsMap] = useState<Record<string, AdminAuthMethodInfo>>({});
   const [statusAlertModal, setStatusAlertModal] = useState<string | null>(null);
   const [isUpdatingStatusId, setIsUpdatingStatusId] = useState<string | null>(null);
-
-  // Fetch real authentication methods directly from Firebase Auth backend
-  useEffect(() => {
-    if (!isAdmin || maestros.length === 0) return;
-    const uidsToFetch = maestros.slice(0, 100).map((m) => m.id);
-    adminFetchAuthMethods(uidsToFetch).then((map) => {
-      if (map && Object.keys(map).length > 0) {
-        setAuthMethodsMap((prev) => ({ ...prev, ...map }));
-      }
-    });
-  }, [isAdmin, maestros, adminFetchAuthMethods]);
 
   // Zero-leak private verification dossier inspection states
   const [dossierLoading, setDossierLoading] = useState(false);
@@ -118,7 +96,7 @@ export const AdminDashboardView: React.FC = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Active dashboard tabs
-  const [activeTab, setActiveTab] = useState<'maestros' | 'leads' | 'reports' | 'analytics' | 'trades' | 'areas' | 'import'>('maestros');
+  const [activeTab, setActiveTab] = useState<'maestros' | 'leads' | 'reports' | 'analytics' | 'trades' | 'areas'>('maestros');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTrade, setFilterTrade] = useState('');
   const [filterApproval, setFilterApproval] = useState<'all' | 'Aprobado' | 'Pendiente'>('all');
@@ -501,7 +479,6 @@ export const AdminDashboardView: React.FC = () => {
             { id: 'maestros', label: `Maestros & Aprobación (${totalMaestros})`, icon: <Users className="w-4 h-4" /> },
             { id: 'reports', label: `Reportes (${reports.filter(r => r.status === 'pending').length || reports.length})`, icon: <AlertTriangle className="w-4 h-4" /> },
             { id: 'leads', label: `Solicitudes de Contacto (${totalLeads})`, icon: <MessageCircle className="w-4 h-4" /> },
-            { id: 'import', label: 'Importador ManyChat (CSV)', icon: <FileSpreadsheet className="w-4 h-4" /> },
             { id: 'analytics', label: 'Analítica de Plataforma', icon: <BarChart3 className="w-4 h-4" /> },
             { id: 'trades', label: `Oficios (${trades.length})`, icon: <Hammer className="w-4 h-4" /> },
             { id: 'areas', label: `Zonas Querétaro (${serviceAreas.length})`, icon: <MapPin className="w-4 h-4" /> },
@@ -586,7 +563,6 @@ export const AdminDashboardView: React.FC = () => {
                       <th className="py-3.5 px-4">Oficio</th>
                       <th className="py-3.5 px-4">Ubicación</th>
                       <th className="py-3.5 px-4">WhatsApp</th>
-                      <th className="py-3.5 px-4 text-center">Métodos de acceso</th>
                       <th className="py-3.5 px-4 text-center">Status de perfil</th>
                       <th className="py-3.5 px-4 text-center">Verificación</th>
                       <th className="py-3.5 px-4 text-right">Acciones</th>
@@ -602,7 +578,8 @@ export const AdminDashboardView: React.FC = () => {
                                 worker={m}
                                 alt={m.nombre}
                                 size="custom"
-                                className="w-10 h-10 rounded-xl shrink-0"
+                                className="w-10 h-10 !rounded-full shrink-0"
+                                imgClassName="rounded-full"
                               />
                               <div>
                                 <div className="flex items-center gap-1.5">
@@ -647,109 +624,6 @@ export const AdminDashboardView: React.FC = () => {
                               <MessageCircle className="w-3.5 h-3.5 text-green-600" />
                               <span>{sanitizeMexicanPhone(m.telefonoWhatsApp || m.whatsapp || '').displayFormat}</span>
                             </button>
-                          </td>
-
-                          {/* Métodos de acceso: Fuente real Firebase Auth (Phone, Facebook) */}
-                          <td className="py-3.5 px-4 text-center">
-                            {(() => {
-                              const authRecord = authMethodsMap[m.id];
-                              const providers = authRecord ? authRecord.providerIds : (m.authProviders || []);
-                              
-                              // Real auth status: Prioritize real Firebase Auth data from server
-                              const hasFacebook = authRecord
-                                ? authRecord.hasFacebook
-                                : Boolean(providers.includes('facebook.com') || m.origen === 'facebook_auth' || m.source === 'facebook_auth');
-                              
-                              const hasPhone = authRecord
-                                ? authRecord.hasPhone
-                                : Boolean(m.phoneVerified === true || providers.includes('phone') || m.phoneVerificationMethod === 'sms' || m.phoneVerificationMethod === 'firebase_sms');
-
-                              const regMethodTooltip = m.registrationMethod === 'facebook'
-                                ? 'Registro inicial: Facebook'
-                                : m.registrationMethod === 'phone'
-                                ? 'Registro inicial: Teléfono'
-                                : m.registrationMethod
-                                ? `Registro inicial: ${m.registrationMethod}`
-                                : '';
-
-                              // Ambos: Facebook + Teléfono (Vinculada)
-                              if (hasFacebook && hasPhone) {
-                                return (
-                                  <div 
-                                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 border border-slate-200"
-                                    title={`Facebook y Teléfono verificado${regMethodTooltip ? ` • ${regMethodTooltip}` : ''}`}
-                                  >
-                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#1877F2] text-white shadow-xs" title="Facebook">
-                                      <FacebookIcon className="w-3 h-3 fill-current" />
-                                    </span>
-                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white shadow-xs" title="Teléfono verificado">
-                                      <Phone className="w-3 h-3 text-white" />
-                                    </span>
-                                    <span className="text-[10px] font-bold text-slate-700">
-                                      Ambos
-                                    </span>
-                                  </div>
-                                );
-                              }
-
-                              // Teléfono verificado únicamente
-                              if (hasPhone && !hasFacebook) {
-                                return (
-                                  <div 
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200"
-                                    title={`Teléfono verificado${regMethodTooltip ? ` • ${regMethodTooltip}` : ''}`}
-                                  >
-                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white shadow-xs">
-                                      <Phone className="w-3 h-3 text-white" />
-                                    </span>
-                                    <span className="text-[10px] font-bold text-emerald-800">
-                                      Teléfono
-                                    </span>
-                                  </div>
-                                );
-                              }
-
-                              // Facebook únicamente (Sin SMS)
-                              if (hasFacebook && !hasPhone) {
-                                return (
-                                  <div 
-                                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-50 border border-blue-200"
-                                    title={`Facebook (Sin SMS verificado)${regMethodTooltip ? ` • ${regMethodTooltip}` : ''}`}
-                                  >
-                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#1877F2] text-white shadow-xs">
-                                      <FacebookIcon className="w-3 h-3 fill-current" />
-                                    </span>
-                                    <span className="text-[10px] font-bold text-blue-800">
-                                      Facebook
-                                    </span>
-                                    <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-1 py-0.5 rounded" title="Sin SMS confirmado">
-                                      Sin SMS
-                                    </span>
-                                  </div>
-                                );
-                              }
-
-                              // ManyChat CSV Leads
-                              if (m.registrationMethod === 'manychat_csv' || m.source === 'manychat') {
-                                return (
-                                  <div
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200"
-                                    title={`Importado vía ManyChat CSV${regMethodTooltip ? ` • ${regMethodTooltip}` : ''}`}
-                                  >
-                                    <FileSpreadsheet className="w-3.5 h-3.5 text-orange-600" />
-                                    <span className="text-[10px] font-bold text-orange-800">
-                                      ManyChat CSV
-                                    </span>
-                                  </div>
-                                );
-                              }
-
-                              return (
-                                <span className="text-[11px] font-medium text-slate-400" title={regMethodTooltip || 'Sin métodos registrados'}>
-                                  —
-                                </span>
-                              );
-                            })()}
                           </td>
 
                           {/* Status de perfil: Dos únicos estados (Pendiente / Aprobado) + Indicador independiente de disponibilidad */}
@@ -1321,11 +1195,6 @@ export const AdminDashboardView: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 6: IMPORTADOR MANYCHAT (CSV) */}
-        {activeTab === 'import' && (
-          <ManyChatImporter onImport={importManyChatLeads} existingMaestros={maestros} />
-        )}
-
       </div>
 
       {/* MODAL: VERIFICATION & PROFILE AUDIT */}
@@ -1338,7 +1207,8 @@ export const AdminDashboardView: React.FC = () => {
                   worker={reviewingMaestro}
                   alt={reviewingMaestro.nombre}
                   size="custom"
-                  className="w-12 h-12 rounded-2xl shrink-0"
+                  className="w-12 h-12 !rounded-full shrink-0"
+                  imgClassName="rounded-full"
                 />
                 <div>
                   <h3 className="text-lg font-black text-slate-900">{reviewingMaestro.nombre}</h3>

@@ -908,7 +908,8 @@ export const WorkerDashboardView: React.FC = () => {
                 previewUrl={pendingPhotoPreviewUrl}
                 alt={`${currentWorker.firstName} ${currentWorker.lastName}`}
                 size="lg"
-                imgClassName="transition-transform duration-300 group-hover:scale-105"
+                className="!rounded-full"
+                imgClassName="rounded-full transition-transform duration-300 group-hover:scale-105"
               >
                 {/* Uploading indicator overlay */}
                 {isUploadingProfilePhoto && (
@@ -954,48 +955,41 @@ export const WorkerDashboardView: React.FC = () => {
             </div>
 
             <div className="flex-1 space-y-2 text-center sm:text-left">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-2 justify-center sm:justify-start">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
-                  {currentWorker.firstName} {currentWorker.lastName}
-                </h1>
-                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border font-black text-[11px] sm:text-xs tracking-wide uppercase shadow-xs w-fit mx-auto sm:mx-0 ${
-                  isVerified
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                    : 'bg-slate-100 text-slate-800 border-slate-300'
-                }`}>
-                  {isVerified ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>VERIFICADO</span>
-                    </>
-                  ) : (
-                    <>
-                      <Shield className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      <span>REGISTRADO</span>
-                    </>
-                  )}
-                </div>
-              </div>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
+                {currentWorker.firstName} {currentWorker.lastName}
+              </h1>
 
               <p className="text-lg sm:text-xl font-black text-[#FF6B00]">{currentWorker.mainTrade}</p>
+
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border font-black text-[11px] sm:text-xs tracking-wide uppercase shadow-xs w-fit mx-auto sm:mx-0 ${
+                isVerified
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : 'bg-slate-100 text-slate-800 border-slate-300'
+              }`}>
+                {isVerified ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>VERIFICADO</span>
+                  </>
+                ) : (
+                  <>
+                    <Shield className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <span>REGISTRADO</span>
+                  </>
+                )}
+              </div>
 
               <p className="text-sm text-slate-500 flex items-center justify-center sm:justify-start gap-1.5">
                 <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
                 <span>{currentWorker.serviceAreas.join(', ')}</span>
               </p>
 
-              {currentWorker.profilePhotoReviewStatus && (
+              {(currentWorker.profilePhotoReviewStatus === 'pending' || currentWorker.profilePhotoReviewStatus === 'rejected') && (
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                   {currentWorker.profilePhotoReviewStatus === 'pending' && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold">
                       <Clock className="w-3 h-3 text-amber-700" />
                       Foto en moderación
-                    </span>
-                  )}
-                  {currentWorker.profilePhotoReviewStatus === 'approved' && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 text-xs font-bold">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-700" />
-                      Foto pública aprobada
                     </span>
                   )}
                   {currentWorker.profilePhotoReviewStatus === 'rejected' && (
@@ -1022,68 +1016,58 @@ export const WorkerDashboardView: React.FC = () => {
           {/* Disponibilidad */}
           <div
             id="worker-availability-card"
-            className={`px-6 sm:px-8 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+            className={`px-6 sm:px-8 py-6 space-y-3 ${
               isAvailable ? 'bg-emerald-50/40' : 'bg-amber-50/40'
             }`}
           >
-            <div className="flex items-start sm:items-center gap-3.5">
-              <div className={`w-3 h-3 rounded-full mt-1 sm:mt-0 shrink-0 ${isAvailable ? 'bg-emerald-500 shadow-xs' : 'bg-amber-500'}`} />
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm sm:text-base font-black text-slate-900">
-                    {isAvailable ? 'Disponible para nuevos trabajos' : 'Tu disponibilidad está pausada'}
-                  </span>
-                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
-                    isAvailable ? 'bg-emerald-200/80 text-emerald-900' : 'bg-amber-200 text-amber-900'
-                  }`}>
-                    {isAvailable ? 'Activo' : 'Oculto'}
-                  </span>
-                </div>
-              </div>
+            <div className="flex items-center gap-2">
+              <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isAvailable ? 'bg-emerald-500 shadow-xs' : 'bg-amber-500'}`} />
+              <span className={`text-sm font-black uppercase tracking-wide ${isAvailable ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {isAvailable ? 'Activo' : 'Oculto'}
+              </span>
             </div>
 
-            <div className="w-full sm:w-auto shrink-0">
-              {isAvailable ? (
-                <button
-                  type="button"
-                  id="pause-availability-btn"
-                  onClick={() => setShowAvailabilityModal(true)}
-                  className="w-full sm:w-auto py-3 px-5 bg-white hover:bg-slate-100 active:scale-[0.99] border border-slate-300 text-slate-700 hover:text-slate-900 font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <PauseCircle className="w-4 h-4 text-slate-500" />
-                  <span>Pausar mi disponibilidad</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  id="resume-availability-btn"
-                  disabled={isTogglingAvailability}
-                  onClick={handleToggleAvailability}
-                  className="w-full sm:w-auto py-3 px-6 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {isTogglingAvailability ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Activando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <PlayCircle className="w-4 h-4" />
-                      <span>Volver a estar disponible</span>
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
+            {isAvailable ? (
+              <button
+                type="button"
+                id="pause-availability-btn"
+                onClick={() => setShowAvailabilityModal(true)}
+                className="w-full py-4 px-5 bg-white hover:bg-slate-100 active:scale-[0.99] border border-slate-300 text-slate-700 hover:text-slate-900 font-bold text-sm sm:text-base rounded-2xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <PauseCircle className="w-5 h-5 text-slate-500" />
+                <span>Pausar mi disponibilidad</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                id="resume-availability-btn"
+                disabled={isTogglingAvailability}
+                onClick={handleToggleAvailability}
+                className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-sm sm:text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isTogglingAvailability ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Activando...</span>
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle className="w-5 h-5" />
+                    <span>Volver a estar disponible</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="border-t border-slate-100" />
 
           {/* Completitud */}
           <div className="px-6 sm:px-8 py-5 space-y-2">
-            <div className="flex justify-between items-center text-xs font-bold">
-              <span className="text-slate-700">Completitud de tu perfil</span>
-              <span className="text-[#FF6B00]">{completionScore}%</span>
+            <div className="flex justify-between items-center">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Registro básico</span>
+              <span className="text-2xl font-black text-[#FF6B00]">{completionScore}%</span>
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Perfil Verificado</span>
             </div>
             <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
               <div
@@ -1197,38 +1181,13 @@ export const WorkerDashboardView: React.FC = () => {
 
             {/* SECCIÓN INTEGRADA DE VERIFICACIÓN Y CONFIANZA */}
             <div id="verification-summary-section" className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-orange-100 text-[#FF6B00] flex items-center justify-center shrink-0">
-                      <ShieldCheck className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-black text-slate-900 tracking-tight">
-                        Verificación y confianza
-                      </h2>
-                      <p className="text-xs text-slate-500">
-                        {isVerified 
-                          ? 'Tu perfil cuenta con la insignia de confianza oficial de Maestro Cerca.' 
-                          : 'Requisitos para obtener la insignia de Verificado por Maestro Cerca.'}
-                      </p>
-                    </div>
-                  </div>
-                  <span className={`text-[11px] font-black uppercase px-3 py-1 rounded-full border ${
-                    isVerified 
-                      ? 'bg-emerald-100 text-emerald-900 border-emerald-300' 
-                      : 'bg-slate-100 text-slate-700 border-slate-200'
-                  }`}>
-                    Estatus: {isVerified ? 'Verificado' : 'Registrado'}
-                  </span>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-100 text-[#FF6B00] flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
                 </div>
-
-                {/* Beneficio destacado */}
-                <div className="p-4 rounded-2xl bg-orange-50/80 border border-orange-200/90 text-orange-950">
-                  <p className="text-xs sm:text-sm text-orange-950 leading-relaxed font-medium">
-                    ✨ <strong>Un perfil verificado genera mayor confianza y puede aumentar tus contactos.</strong>
-                  </p>
-                </div>
+                <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                  Verificación y confianza
+                </h2>
               </div>
 
               {isVerified ? (
@@ -1274,57 +1233,6 @@ export const WorkerDashboardView: React.FC = () => {
                     </div>
                   ) : (
                     <form onSubmit={handleVerificationSubmit} className="space-y-4 pt-1">
-                      {/* Optional Documents / Technical diplomas */}
-                      <div className="space-y-2 p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                        <div>
-                          <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">
-                            Comprobante técnico, diploma o certificado <span className="text-slate-400 font-normal lowercase">(opcional)</span>
-                          </h4>
-                          <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                            Sube diplomas de cursos, certificaciones técnicas (por ejemplo CONOCER, gasista, electricista) o reconocimientos de oficio si cuentas con ellos.
-                          </p>
-                        </div>
-                        <div className="space-y-2 pt-1">
-                          <input
-                            type="file"
-                            accept="image/*,application/pdf"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const check = validateVerificationDoc(file, 10);
-                                if (!check.valid) {
-                                  alert(check.error);
-                                  return;
-                                }
-                                setVerifDocFile(file);
-                                setVerifDocName(file.name);
-                              }
-                            }}
-                            className="w-full text-xs text-slate-600 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-900 file:text-white hover:file:bg-black cursor-pointer"
-                          />
-                          {verifDocFile && (
-                            <div className="text-xs text-emerald-700 font-bold flex items-center gap-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                              <span>Archivo adjunto: {verifDocFile.name} ({(verifDocFile.size / 1024 / 1024).toFixed(2)} MB)</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Optional Notes for Reviewer */}
-                      <div className="space-y-2 p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                        <label className="block text-xs font-black uppercase text-slate-800 tracking-wide">
-                          Notas adicionales para el revisor <span className="text-slate-400 font-normal lowercase">(opcional)</span>
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={verifNotes}
-                          onChange={(e) => setVerifNotes(e.target.value)}
-                          placeholder="Ejemplo: Realizo instalaciones residenciales y comerciales en Querétaro desde hace 8 años."
-                          className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-hidden transition-all"
-                        />
-                      </div>
-
                       {/* Botón: Solicitar revisión para verificarme */}
                       <div className="pt-2 space-y-2.5">
                         <button
@@ -1344,12 +1252,6 @@ export const WorkerDashboardView: React.FC = () => {
                             </>
                           )}
                         </button>
-
-                        {!allVerificationRequirementsMet && (
-                          <p className="text-center text-xs font-bold text-amber-800 bg-amber-50 py-2.5 px-4 rounded-xl border border-amber-200">
-                            Completa los requisitos obligatorios antes de solicitar revisión.
-                          </p>
-                        )}
                       </div>
                     </form>
                   )}
@@ -1359,15 +1261,12 @@ export const WorkerDashboardView: React.FC = () => {
 
             {/* INFORMACIÓN DEL PERFIL */}
             <div id="section-basic-info" className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Información básica del trabajador</h2>
-                  <p className="text-xs text-slate-500">Mantén tus datos actualizados para que los clientes puedan llamarte.</p>
-                </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Información básica del trabajador</h2>
+                <p className="text-xs text-slate-500">Mantén tus datos actualizados para que los clientes puedan llamarte.</p>
               </div>
-            </div>
 
-            <form onSubmit={handleSaveProfile} className="space-y-5">
+              <form onSubmit={handleSaveProfile} className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-700 mb-1">Nombre</label>
@@ -1429,18 +1328,6 @@ export const WorkerDashboardView: React.FC = () => {
                       : 'Número de contacto. Para que aparezca como verificado ante los clientes, debes validarlo con SMS en Métodos de Acceso.'}
                   </p>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">WhatsApp</label>
-                  <input
-                    type="text"
-                    value={formData.whatsapp}
-                    onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Número al que los clientes enviarán mensajes de WhatsApp.
-                  </p>
-                </div>
               </div>
 
               <div>
@@ -1487,7 +1374,7 @@ export const WorkerDashboardView: React.FC = () => {
               </div>
 
               {/* SERVICIOS ESPECÍFICOS QUE REALIZAS (INTEGRADO EN MI PERFIL) */}
-              <div id="worker-services-section" className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+              <div id="worker-services-section" className="pt-2 border-t border-slate-100 space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <label className="block text-xs font-black uppercase text-slate-900 tracking-wide">
@@ -1551,11 +1438,7 @@ export const WorkerDashboardView: React.FC = () => {
                   </div>
                 )}
 
-                {formData.services.length === 0 ? (
-                  <p className="text-xs text-amber-800 italic bg-amber-50 p-3 rounded-xl border border-amber-200">
-                    Aún no has registrado servicios específicos. Los clientes suelen decidir contactar basándose en las tareas que puedes realizar.
-                  </p>
-                ) : (
+                {formData.services.length > 0 && (
                   <div className="flex flex-wrap gap-2 pt-1">
                     {formData.services.map((srv, idx) => (
                       <span
@@ -1634,7 +1517,8 @@ export const WorkerDashboardView: React.FC = () => {
                   )}
                 </button>
               </div>
-            </form>
+              </form>
+            </div>
 
             {/* SECCIÓN MÉTODOS DE ACCESO (Account Linking) */}
             <div id="access-methods-section" className="mt-8 pt-6 border-t border-slate-200 space-y-4">
