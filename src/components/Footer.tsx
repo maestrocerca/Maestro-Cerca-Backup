@@ -21,7 +21,20 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16 bg-[#0c2340]">
+      <div 
+        className="mx-auto bg-[#0c2340]"
+        style={{
+          paddingTop: '63px',
+          paddingBottom: '66px',
+          paddingLeft: '50px',
+          paddingRight: '50px',
+          marginTop: '-2px',
+          marginBottom: '0px',
+          marginRight: '0px',
+          maxWidth: '1151px',
+          width: '100%',
+        }}
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
           
           {/* Brand Col */}
@@ -33,7 +46,15 @@ export const Footer: React.FC = () => {
               <img 
                 src={footerLogo} 
                 alt="Maestro Cerca Logo" 
-                className="h-9 sm:h-10 w-auto object-contain p-0 m-0" 
+                style={{
+                  height: '41px',
+                  width: '131.365px',
+                  marginLeft: '6px',
+                  marginRight: '4px',
+                  marginTop: '-2px',
+                  marginBottom: '-1px',
+                }}
+                className="object-contain" 
               />
             </div>
             
@@ -49,7 +70,7 @@ export const Footer: React.FC = () => {
 
           {/* Col 1: Clientes */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff8415]">
               Para clientes
             </h4>
             <ul className="space-y-2 text-sm">
@@ -66,14 +87,14 @@ export const Footer: React.FC = () => {
 
           {/* Col 2: Trabajadores */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff8415]">
               Para trabajadores
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <button
                   onClick={() => navigateTo({ type: 'register' })}
-                  className="text-orange-400 hover:text-orange-300 font-medium transition-colors text-left"
+                  className="text-white hover:text-orange-300 font-medium transition-colors text-left"
                 >
                   Registrarme como trabajador
                 </button>
@@ -90,8 +111,14 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Col 3: Legal & Soporte */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+          <div 
+            className="space-y-3"
+            style={{
+              width: '167.802px',
+              minHeight: '172px',
+            }}
+          >
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff8415]">
               Legal y soporte
             </h4>
             <ul className="space-y-2 text-sm">
