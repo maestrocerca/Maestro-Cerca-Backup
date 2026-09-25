@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   ArrowRight,
   PhoneCall,
-  Users,
   Image as ImageIcon,
   Sparkles,
   Award,
@@ -397,11 +396,6 @@ export const HomeView: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
             
             <div className="md:col-span-8 space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-950 text-orange-300 border border-orange-800/60 text-xs font-semibold">
-                <Users className="w-3.5 h-3.5" />
-                <span>Comunidad de trabajadores y especialistas de oficios</span>
-              </div>
-
               <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
                 ¿Trabajas en construcción, mantenimiento o remodelación?
               </h2>
