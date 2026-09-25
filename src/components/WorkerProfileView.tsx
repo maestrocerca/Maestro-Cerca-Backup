@@ -285,7 +285,14 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
                 {worker.firstName} {worker.lastName}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-700 font-medium">
+              <div 
+                className="flex flex-wrap items-center gap-4 text-sm text-slate-700 font-medium"
+                style={{
+                  marginTop: '-8px',
+                  paddingTop: '0px',
+                  paddingRight: '0px',
+                }}
+              >
                 <span className="font-bold text-orange-600 text-base">
                   {worker.mainTrade}
                 </span>
@@ -334,7 +341,12 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
           )}
 
           {/* Desktop Contact CTA Row */}
-          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-wrap items-center gap-3 sm:gap-4">
+          <div 
+            className="pt-6 border-t border-slate-100 flex flex-wrap items-center gap-3 sm:gap-4"
+            style={{
+              marginTop: '18px',
+            }}
+          >
             {worker.isAvailable === false ? (
               <div className="flex-1 p-3.5 bg-slate-100 rounded-xl text-slate-600 text-xs sm:text-sm font-semibold flex items-center gap-2">
                 <Clock className="w-4 h-4 text-slate-400 shrink-0" />
@@ -376,7 +388,10 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
           <div className="lg:col-span-8 space-y-8">
             
             {/* 1. TOP PRIORITY SECTION: TRABAJOS REALIZADOS (PHOTO GALLERY) */}
-            <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
+            <section 
+              className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4"
+              style={{ marginTop: '-20px' }}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -434,7 +449,10 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
             </section>
 
             {/* 2. TRABAJOS QUE REALIZA */}
-            <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
+            <section 
+              className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4"
+              style={{ marginTop: '-20px', marginBottom: '32px' }}
+            >
               <div>
                 <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                   <Wrench className="w-5 h-5 text-orange-600" />
@@ -463,7 +481,10 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
             </section>
 
             {/* 3. ACERCA DE */}
-            <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
+            <section 
+              className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4"
+              style={{ marginTop: '-20px' }}
+            >
               <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <Briefcase className="w-5 h-5 text-orange-600" />
                 <span>Acerca de {worker.firstName}</span>
@@ -479,7 +500,10 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
           <div className="lg:col-span-4 space-y-6">
             
             {/* 4. VERIFICACIONES DE CONFIANZA */}
-            <section className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+            <section 
+              className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4"
+              style={{ marginTop: '-20px', marginBottom: '32px' }}
+            >
               <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
                 <Award className="w-5 h-5 text-orange-600" />
                 <h3 className="font-bold text-slate-900 text-base">
@@ -553,7 +577,10 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
             </section>
 
             {/* 5. ZONAS DONDE TRABAJA */}
-            <section className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-3">
+            <section 
+              className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-3"
+              style={{ marginTop: '-20px', marginBottom: '32px' }}
+            >
               <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                 <MapPin className="w-5 h-5 text-orange-600" />
                 <h3 className="font-bold text-slate-900 text-base">
@@ -576,7 +603,10 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
             </section>
 
             {/* 6. EXPERIENCIA */}
-            <section className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-3">
+            <section 
+              className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-3"
+              style={{ marginTop: '-20px', marginBottom: '32px' }}
+            >
               <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                 <Clock className="w-5 h-5 text-orange-600" />
                 <h3 className="font-bold text-slate-900 text-base">
@@ -594,7 +624,10 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
             </section>
 
             {/* 7. AVISO LEGAL DISCRETO */}
-            <div className="p-4 rounded-2xl bg-slate-100/90 border border-slate-200 text-slate-600 text-xs leading-relaxed flex flex-col gap-2">
+            <div 
+              className="p-4 rounded-2xl bg-slate-100/90 border border-slate-200 text-slate-600 text-xs leading-relaxed flex flex-col gap-2"
+              style={{ marginTop: '-20px' }}
+            >
               <div className="flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                 <p>
