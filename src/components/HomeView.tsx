@@ -132,7 +132,16 @@ export const HomeView: React.FC = () => {
         <div className="absolute inset-0 bg-[radial-gradient(#ea580c_1px,transparent_1px)] [background-size:28px_28px] opacity-10 pointer-events-none" />
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.12] mb-8 sm:mb-10">
+          <h1 
+            className="font-black text-slate-900 tracking-tight leading-[1.12] mx-auto"
+            style={{
+              fontSize: '55px',
+              width: '700px',
+              maxWidth: '100%',
+              marginBottom: '36px',
+              textAlign: 'center',
+            }}
+          >
             Encuentra trabajadores de <span className="text-orange-600">confianza</span> cerca de ti
           </h1>
 
@@ -342,17 +351,7 @@ export const HomeView: React.FC = () => {
             </div>
 
             {/* Trust checklist visual */}
-            <div 
-              className="lg:col-span-5 bg-slate-800 pr-6 sm:pr-8 rounded-2xl border border-slate-700 space-y-4 max-w-full"
-              style={{
-                width: '373px',
-                height: '385px',
-                paddingLeft: '30px',
-                paddingTop: '38px',
-                paddingBottom: '10px',
-                marginBottom: '0px',
-              }}
-            >
+            <div className="lg:col-span-5 bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-700 space-y-4">
               <h3 className="font-bold text-slate-100 text-lg flex items-center gap-2">
                 <Award className="w-5 h-5 text-orange-400" />
                 <span>Señales de verificación</span>
