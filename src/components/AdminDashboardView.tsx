@@ -618,11 +618,13 @@ export const AdminDashboardView: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => contactarWhatsApp(m)}
-                              className="flex items-center gap-1.5 text-green-700 hover:text-green-800 font-semibold cursor-pointer"
+                              style={{ width: '80px' }}
+                              className="text-green-700 hover:text-green-800 font-semibold cursor-pointer text-left inline-block"
                               title="Probar enlace de WhatsApp"
                             >
-                              <MessageCircle className="w-3.5 h-3.5 text-green-600" />
-                              <span>{sanitizeMexicanPhone(m.telefonoWhatsApp || m.whatsapp || '').displayFormat}</span>
+                              <span style={{ fontSize: '12px', width: 'auto' }}>
+                                {sanitizeMexicanPhone(m.telefonoWhatsApp || m.whatsapp || '').displayFormat}
+                              </span>
                             </button>
                           </td>
 
