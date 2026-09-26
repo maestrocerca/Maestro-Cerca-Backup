@@ -2794,28 +2794,28 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [isAdmin]);
 
   const adminVerifyMaestro = useCallback(async (
-    maestroId: string, 
-    verificado: boolean, 
-    checks?: { 
-      identityVerified?: boolean; 
-      referencesVerified?: boolean; 
-      photosReviewed?: boolean; 
+    maestroId: string,
+    verificado: boolean,
+    checks?: {
+      identityVerified?: boolean;
+      referencesVerified?: boolean;
+      photosReviewed?: boolean;
       adminEmail?: string;
     }
   ) => {
+    // NOTE: this intentionally does NOT set `verificado` / `verificationStatus`
+    // / `verifiedAt` / `verifiedBy` anymore. "Perfil Verificado" is earned
+    // automatically from real platform activity (see isProfileVerified() in
+    // types.ts) and is never granted manually by an admin, so the `verificado`
+    // boolean param is only kept for this function's existing call signature
+    // and no longer has any effect on the public badge. This just records the
+    // admin's internal identity/photo review checklist for the maestro's
+    // expediente.
     const updates: Partial<Maestro> = {
-      verificado,
-      verificationStatus: verificado ? 'verified' : 'registered',
       tieneVerificacionPendiente: false,
       identityVerified: checks?.identityVerified !== undefined ? checks.identityVerified : verificado,
       referencesVerified: checks?.referencesVerified !== undefined ? checks.referencesVerified : verificado,
       photosReviewed: checks?.photosReviewed !== undefined ? checks.photosReviewed : verificado,
-      ...(verificado
-        ? {
-            verifiedAt: new Date().toISOString(),
-            verifiedBy: checks?.adminEmail || 'admin',
-          }
-        : {}),
       updatedAt: new Date().toISOString(),
     };
 

@@ -35,14 +35,13 @@ import { cleanMexicanPhoneInput } from '../lib/whatsapp';
 import { FACEBOOK_AUTH_ENABLED } from '../config/featureFlags';
 import { WorkPhoto } from '../types';
 import { WorkerAvatar } from './WorkerAvatar';
-import { VerificationRadialProgress, VerificationRequirementItem } from './VerificationRadialProgress';
-import { 
-  uploadWorkerProfileImage, 
-  uploadWorkerWorkPhoto, 
-  uploadVerificationDocument, 
+import { VerificationRadialProgress } from './VerificationRadialProgress';
+import {
+  uploadWorkerProfileImage,
+  uploadWorkerWorkPhoto,
   validateImageFile,
-  validateVerificationDoc 
 } from '../lib/storage';
+import { getVerifiedProfileRequirements, isProfileVerified } from '../types';
 
 const WhatsAppGlyph: React.FC<{ className?: string }> = ({ className }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
@@ -57,7 +56,6 @@ export const WorkerDashboardView: React.FC = () => {
     logoutWorker,
     updateWorkerProfile, 
     setWorkerAvailability,
-    submitVerificationRequest, 
     submitPendingProfilePhoto,
     addWorkerPhoto, 
     addWorkerPhotosBatch,
@@ -117,13 +115,6 @@ export const WorkerDashboardView: React.FC = () => {
   // Worker availability modal state
   const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
   const [isTogglingAvailability, setIsTogglingAvailability] = useState(false);
-
-  // Verification request form state (optional documents and optional notes, NO references)
-  const [verifDocFile, setVerifDocFile] = useState<File | null>(null);
-  const [verifDocName, setVerifDocName] = useState('');
-  const [verifNotes, setVerifNotes] = useState('');
-  const [verifSubmitted, setVerifSubmitted] = useState(false);
-  const [isSubmittingVerif, setIsSubmittingVerif] = useState(false);
 
   // ManyChat / WhatsApp claimed profile one-time banner
   const [showManyChatBanner, setShowManyChatBanner] = useState(() => {
@@ -261,7 +252,9 @@ export const WorkerDashboardView: React.FC = () => {
   }
 
   const completionScore = calculateProfileCompletion(currentWorker);
-  const isVerified = currentWorker.verificationStatus === 'verified' || currentWorker.verificado === true;
+  const isVerified = isProfileVerified(currentWorker);
+  const verifiedProfileRequirements = getVerifiedProfileRequirements(currentWorker);
+  const completedVerifiedRequirementsCount = verifiedProfileRequirements.filter((r) => r.isCompleted).length;
 
   // Real Provider inspection directly from Firebase Authentication
   const providers = firebaseUser?.providerData || [];
@@ -287,81 +280,12 @@ export const WorkerDashboardView: React.FC = () => {
   const isFacebookLinked = Boolean(facebookProvider);
   const isAvailable = currentWorker.isAvailable !== false;
 
-  // Core verification requirements calculation:
-  // 1. Nombre y oficio
-  const reqNameTrade = Boolean(
-    ((formData.firstName && formData.lastName) || (currentWorker.firstName && currentWorker.lastName) || currentWorker.nombre) &&
-    (formData.mainTrade || currentWorker.mainTrade || currentWorker.oficio)
-  );
-
-  // 2. Teléfono verificado por SMS
-  const reqPhone = isTrulyPhoneVerified;
-
-  // 3. Foto aprobada por administración
+  // Foto aprobada por administración (still used by the WhatsApp-registration
+  // reminder banner below, independent of the Perfil Verificado checklist)
   const reqPhotoApproved = Boolean(
     (currentWorker.profilePhoto || currentWorker.fotoUrl) &&
     currentWorker.profilePhotoReviewStatus === 'approved'
   );
-
-  // 4. Al menos 3 fotos de trabajos
-  const reqWorkPhotos3 = Boolean(
-    portfolioPhotos.length >= 3 ||
-    (currentWorker.workPhotos && currentWorker.workPhotos.length >= 3) ||
-    (currentWorker.fotosTrabajos && currentWorker.fotosTrabajos.length >= 3)
-  );
-
-  // 5. Al menos 2 servicios
-  const reqServices2 = Boolean(formData.services && formData.services.length >= 2);
-
-  const verificationItems: VerificationRequirementItem[] = [
-    {
-      id: 'nameTrade',
-      label: 'Nombre y oficio',
-      isCompleted: reqNameTrade,
-      hint: 'Nombre completo y especialidad u oficio principal',
-      actionTab: 'profile',
-      anchorId: 'section-basic-info',
-    },
-    {
-      id: 'phone',
-      label: 'Teléfono verificado',
-      isCompleted: reqPhone,
-      hint: 'Número de WhatsApp autenticado con SMS',
-      actionTab: 'profile',
-      anchorId: 'access-methods-section',
-    },
-    {
-      id: 'photo',
-      label: 'Foto de perfil aprobada',
-      isCompleted: reqPhotoApproved,
-      hint: currentWorker.profilePhotoReviewStatus === 'pending'
-        ? 'Foto enviada, pendiente de revisión administrativa'
-        : currentWorker.profilePhotoReviewStatus === 'rejected'
-        ? 'Foto rechazada. Por favor sube una nueva imagen'
-        : 'Fotografía personal revisada y aprobada por el equipo',
-      actionTab: 'profile',
-      anchorId: 'section-profile-header',
-    },
-    {
-      id: 'workPhotos',
-      label: 'Al menos 3 fotos de trabajos',
-      isCompleted: reqWorkPhotos3,
-      hint: `Tienes ${portfolioPhotos.length} de 3 fotos mínimas en tu portafolio`,
-      actionTab: 'photos',
-    },
-    {
-      id: 'services',
-      label: 'Al menos 2 servicios que realizas',
-      isCompleted: reqServices2,
-      hint: `Tienes ${formData.services.length} de 2 servicios mínimos registrados`,
-      actionTab: 'profile',
-      anchorId: 'worker-services-section',
-    },
-  ];
-
-  const completedVerificationCount = verificationItems.filter((i) => i.isCompleted).length;
-  const totalVerificationCount = verificationItems.length;
-  const allVerificationRequirementsMet = completedVerificationCount === totalVerificationCount;
 
   // Metrics for this worker
   const workerEvents = contactEvents.filter((e) => e.workerId === currentWorker.id);
@@ -703,40 +627,6 @@ export const WorkerDashboardView: React.FC = () => {
     updateWorkerProfile(currentWorker.id, { services: updated });
   };
 
-  const handleVerificationSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentWorker) return;
-    if (!allVerificationRequirementsMet) {
-      setSaveError('Completa los requisitos obligatorios antes de solicitar revisión.');
-      return;
-    }
-    setIsSubmittingVerif(true);
-    setSaveError('');
-    try {
-      let finalDocPath = '';
-      if (verifDocFile && firebaseUser) {
-        const uploadRes = await uploadVerificationDocument(firebaseUser.uid, verifDocFile, 'comprobante');
-        finalDocPath = uploadRes.storagePath;
-      }
-
-      const res = await submitVerificationRequest(currentWorker.id, {
-        documents: finalDocPath ? [finalDocPath] : [],
-        notes: verifNotes.trim(),
-      });
-
-      if (res.success) {
-        setVerifSubmitted(true);
-        showToast('Solicitud de revisión enviada exitosamente.');
-      } else {
-        setSaveError(res.error || 'No se pudo enviar la solicitud.');
-      }
-    } catch (err: any) {
-      console.error('Verification submission error:', err);
-      setSaveError(err?.message || 'Error al procesar la solicitud de verificación.');
-    } finally {
-      setIsSubmittingVerif(false);
-    }
-  };
 
   const handleDeleteAccount = async () => {
     if (!currentWorker) return;
@@ -874,7 +764,7 @@ export const WorkerDashboardView: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-sm text-orange-900 leading-relaxed font-medium">
-                  Sube o toma tu foto de perfil ahora para que los clientes puedan verificar que eres tú. Sin ella, tu perfil se queda en "Registrado" en lugar de avanzar a "Verificado".
+                  Sube o toma tu foto de perfil ahora para que los clientes puedan verificar que eres tú. Es uno de los requisitos para avanzar hacia "Verificado".
                 </p>
               </div>
             </div>
@@ -1197,64 +1087,20 @@ export const WorkerDashboardView: React.FC = () => {
                     <span>Tu perfil ya cuenta con verificación oficial en Maestro Cerca</span>
                   </div>
                   <p className="text-xs text-emerald-800 leading-relaxed pl-7">
-                    Tu identidad, número telefónico y fotografías de trabajos han sido revisados y validados por el equipo administrativo.
+                    Construiste historial real en la plataforma: tienes foto de perfil, fotos de trabajos, y al menos un trabajo confirmado y calificado.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {/* Radial circular progress with requirements list */}
+                <div className="space-y-4">
+                  {/* Radial circular progress with requirements list — automatic, no request/approval flow */}
                   <VerificationRadialProgress
-                    completedCount={completedVerificationCount}
-                    totalCount={totalVerificationCount}
-                    items={verificationItems}
-                    onNavigateTab={(tab, anchorId) => {
-                      setActiveTab(tab);
-                      if (anchorId) {
-                        setTimeout(() => {
-                          const el = document.getElementById(anchorId);
-                          if (el) {
-                            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                          }
-                        }, 100);
-                      }
-                    }}
+                    completedCount={completedVerifiedRequirementsCount}
+                    totalCount={verifiedProfileRequirements.length}
+                    items={verifiedProfileRequirements}
                   />
-
-                  {/* Estado: Solicitud en revisión */}
-                  {(verifSubmitted || currentWorker.tieneVerificacionPendiente || currentWorker.verificationRequest?.status === 'pending') ? (
-                    <div className="p-5 rounded-2xl bg-slate-100 border border-slate-200 text-slate-800 space-y-2">
-                      <div className="flex items-center gap-2 font-black text-sm text-slate-900">
-                        <Clock className="w-5 h-5 text-[#FF6B00] shrink-0" />
-                        <span>Solicitud en revisión</span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        Hemos recibido tus datos y comprobantes de respaldo. El equipo de administración revisará la información de tu perfil para validar tu insignia de <strong>"Verificado por Maestro Cerca"</strong>.
-                      </p>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleVerificationSubmit} className="space-y-4 pt-1">
-                      {/* Botón: Solicitar revisión para verificarme */}
-                      <div className="pt-2 space-y-2.5">
-                        <button
-                          type="submit"
-                          disabled={!allVerificationRequirementsMet || isSubmittingVerif}
-                          className="w-full py-3.5 px-6 bg-[#FF6B00] hover:bg-[#e65f00] active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:cursor-not-allowed"
-                        >
-                          {isSubmittingVerif ? (
-                            <>
-                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Enviando solicitud...</span>
-                            </>
-                          ) : (
-                            <>
-                              <ShieldCheck className="w-5 h-5 shrink-0" />
-                              <span>Solicitar revisión para verificarme</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </form>
-                  )}
+                  <p className="text-xs text-slate-500 leading-relaxed px-1">
+                    El estado <strong>"Verificado"</strong> se obtiene automáticamente construyendo historial real dentro de Maestro Cerca — no se compra ni depende de INE, documentos oficiales o validación manual. Por ahora tu perfil se muestra como <strong>"Registrado"</strong>.
+                  </p>
                 </div>
               )}
             </div>

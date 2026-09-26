@@ -33,7 +33,7 @@ import {
 
 import { useStore, DESIGNATED_ADMIN_EMAILS } from '../context/StoreContext';
 import { WorkerAvatar } from './WorkerAvatar';
-import { Maestro, Worker, Trade, ServiceArea, VerificationStatus, ProfileStatus } from '../types';
+import { Maestro, Worker, Trade, ServiceArea, VerificationStatus, ProfileStatus, isProfileVerified, getVerifiedProfileRequirements } from '../types';
 import { sanitizeMexicanPhone } from '../lib/whatsapp';
 import { AdminGuard } from './AdminGuard';
 import { getSecureTransientBlobUrl, listWorkerVerificationDocs } from '../lib/storage';
@@ -331,7 +331,7 @@ export const AdminDashboardView: React.FC = () => {
 
   const handleSaveRequirementsOnly = async () => {
     if (!reviewingMaestro) return;
-    const isCurrentlyVerified = reviewingMaestro.verificado === true || reviewingMaestro.verificationStatus === 'verified';
+    const isCurrentlyVerified = isProfileVerified(reviewingMaestro);
     await adminVerifyMaestro(reviewingMaestro.id, isCurrentlyVerified, {
       identityVerified: checkId,
       referencesVerified: checkRefs,
@@ -360,7 +360,7 @@ export const AdminDashboardView: React.FC = () => {
   const totalMaestros = maestros.length;
   const approvedCount = maestros.filter((m) => m.statusPerfil === 'Aprobado' || (m.statusPerfil === 'Activo' && m.aprobado === true) || (m.statusPerfil === undefined && m.aprobado === true)).length;
   const pendingCount = maestros.filter((m) => m.statusPerfil === 'Pendiente' || (m.statusPerfil !== 'Aprobado' && m.statusPerfil !== 'Activo' && m.aprobado !== true)).length;
-  const verifiedCount = maestros.filter((m) => m.verificado === true || m.verificationStatus === 'verified').length;
+  const verifiedCount = maestros.filter(isProfileVerified).length;
   const inReviewCount = maestros.filter((m) => m.tieneVerificacionPendiente).length;
   const totalLeads = solicitudesContacto.length;
 
@@ -378,7 +378,7 @@ export const AdminDashboardView: React.FC = () => {
     if (filterApproval === 'Pendiente') matchApproval = !isApproved && !isDraft;
     if (filterApproval === 'draft') matchApproval = isDraft;
 
-    const isVerif = m.verificado === true || m.verificationStatus === 'verified';
+    const isVerif = isProfileVerified(m);
     let matchStatus = true;
     if (filterStatus === 'verified') matchStatus = isVerif;
     if (filterStatus === 'review') matchStatus = Boolean(m.tieneVerificacionPendiente);
@@ -679,7 +679,7 @@ export const AdminDashboardView: React.FC = () => {
                           {/* Verificación: Informativa solamente */}
                           <td className="py-3.5 px-4 text-center">
                             {(() => {
-                              const isVerified = m.verificado === true || m.verificationStatus === 'verified';
+                              const isVerified = isProfileVerified(m);
                               const inReview = Boolean(m.tieneVerificacionPendiente);
 
                               if (isVerified) {
@@ -1229,7 +1229,7 @@ export const AdminDashboardView: React.FC = () => {
             {/* Checklist */}
             <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase text-slate-700">Requisitos de Verificación Oficial:</p>
+                <p className="text-xs font-bold uppercase text-slate-700">Expediente interno de identidad:</p>
                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
                   allRequirementsChecked ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                 }`}>
@@ -1460,46 +1460,46 @@ export const AdminDashboardView: React.FC = () => {
               </div>
             )}
 
-            {/* Warning if not all 3 are checked */}
-            {!allRequirementsChecked && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>
-                  Para marcar a este trabajador como <strong>"Verificado por Maestro Cerca"</strong> deben revisarse y cumplirse los 3 requisitos obligatorios del expediente.
+            {/* Real "Perfil Verificado" status: automatic, built from real activity.
+                This is informational only — nothing here can be toggled by an
+                admin. See isProfileVerified() / getVerifiedProfileRequirements()
+                in types.ts for the single source of truth. */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase text-slate-700">Estado real de Perfil Verificado:</p>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                  isProfileVerified(reviewingMaestro) ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {isProfileVerified(reviewingMaestro) ? 'Verificado' : 'Registrado'}
                 </span>
               </div>
-            )}
-
-            {/* If already verified, show audit badge */}
-            {(reviewingMaestro.verificado || reviewingMaestro.verificationStatus === 'verified') && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span>
-                    <strong>Verificado por Maestro Cerca</strong>
-                    {reviewingMaestro.verifiedAt && (
-                      <span className="text-blue-700 ml-1">
-                        el {new Date(reviewingMaestro.verifiedAt).toLocaleDateString('es-MX')}
-                      </span>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Este estado se calcula solo, a partir del historial real del trabajador en la plataforma. No se compra, no depende de INE u otros documentos, y ningún administrador puede otorgarlo manualmente.
+              </p>
+              <div className="space-y-1.5 pt-1">
+                {getVerifiedProfileRequirements(reviewingMaestro).map((req) => (
+                  <div key={req.id} className="flex items-center gap-2 text-[11px]">
+                    {req.isCompleted ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     )}
-                    {reviewingMaestro.verifiedBy && (
-                      <span className="text-blue-600 ml-1">
-                        por {reviewingMaestro.verifiedBy}
-                      </span>
-                    )}
-                  </span>
-                </div>
+                    <span className={req.isCompleted ? 'text-slate-700' : 'text-slate-500'}>{req.label}</span>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
 
-            {/* Action buttons */}
+            {/* Action buttons — these only affect the internal identity
+                expediente above (identityVerified/referencesVerified/
+                photosReviewed), never the "Perfil Verificado" badge. */}
             <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleSaveRequirementsOnly}
                   className="py-2.5 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                  title="Guardar avances de los requisitos sin alterar el estado de verificación"
+                  title="Guardar avances del expediente de identidad"
                 >
                   Guardar requisitos
                 </button>
@@ -1507,9 +1507,9 @@ export const AdminDashboardView: React.FC = () => {
                   type="button"
                   onClick={handleRejectVerification}
                   className="py-2.5 px-3.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                  title="Rechazar o solicitar corrección"
+                  title="Marcar el expediente de identidad como incompleto"
                 >
-                  Rechazar verificación / Solicitar corrección
+                  Marcar expediente como incompleto
                 </button>
               </div>
 
@@ -1522,10 +1522,10 @@ export const AdminDashboardView: React.FC = () => {
                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-emerald-600/20'
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 }`}
-                title={allRequirementsChecked ? 'Aprobar verificación oficial' : 'Requiere los 4 requisitos completados'}
+                title={allRequirementsChecked ? 'Guardar expediente de identidad completo' : 'Requiere los 4 requisitos completados'}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Aprobar verificación</span>
+                <span>Guardar expediente completo</span>
               </button>
             </div>
           </div>

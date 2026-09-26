@@ -164,6 +164,72 @@ export interface Maestro {
 // Worker type is synonymous with Maestro for seamless UI compatibility
 export type Worker = Maestro;
 
+/**
+ * "Perfil Verificado" — built exclusively from real, verifiable activity on
+ * Maestro Cerca. It is never granted manually by an admin, never depends on
+ * INE/official documents, and is never purchased. This is the single source
+ * of truth for whether a worker shows as "Verificado" instead of
+ * "Registrado" — every screen that displays the badge must call
+ * `isProfileVerified()` below rather than reading `verificado` /
+ * `verificationStatus` off the record directly, since those raw fields can
+ * be stale, seeded demo data, or (for `verificado`) still written by legacy
+ * admin tooling that no longer has authority over the public badge.
+ */
+export interface VerifiedProfileRequirement {
+  id: 'account' | 'profilePhoto' | 'workPhotos' | 'ratedJob' | 'noRestrictions';
+  label: string;
+  isCompleted: boolean;
+}
+
+export const MIN_VERIFIED_WORK_PHOTOS = 5;
+
+export function getVerifiedProfileRequirements(worker: Maestro): VerifiedProfileRequirement[] {
+  const workPhotoCount = worker.workPhotos?.length ?? worker.fotosTrabajos?.length ?? 0;
+  return [
+    {
+      id: 'account',
+      label: 'Cuenta creada',
+      isCompleted: true,
+    },
+    {
+      id: 'profilePhoto',
+      label: 'Foto de perfil',
+      isCompleted: Boolean(worker.profilePhoto || worker.fotoUrl || worker.photoUrl),
+    },
+    {
+      id: 'workPhotos',
+      label: `${MIN_VERIFIED_WORK_PHOTOS} fotografías de trabajos`,
+      isCompleted: workPhotoCount >= MIN_VERIFIED_WORK_PHOTOS,
+    },
+    {
+      // Requires real client accounts, confirmed jobs, and a review system —
+      // none of which exist yet in this version of the product. This item
+      // MUST stay false regardless of any other field on the worker record.
+      // There is intentionally no field anywhere that can flip it to true;
+      // it can only become real once that system is built and a genuine
+      // confirmed + rated job exists for this worker.
+      id: 'ratedJob',
+      label: 'Recibir y completar un trabajo mediante Maestro Cerca, y tu primera calificación',
+      isCompleted: false,
+    },
+    {
+      id: 'noRestrictions',
+      label: 'Sin restricciones por reportes confirmados',
+      isCompleted: worker.status !== 'suspended',
+    },
+  ];
+}
+
+/**
+ * Whether a worker has earned the "Verificado" badge. Today this always
+ * evaluates to false for every profile (see the `ratedJob` requirement
+ * above), by design: the platform doesn't yet have client accounts or a
+ * review system, so no one can be Verified yet, only Registrado.
+ */
+export function isProfileVerified(worker: Maestro): boolean {
+  return getVerifiedProfileRequirements(worker).every((r) => r.isCompleted);
+}
+
 export interface PreWorker {
   id: string;
   phoneNumber: string; // E.164 +52XXXXXXXXXX

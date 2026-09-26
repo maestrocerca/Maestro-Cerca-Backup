@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapPin, CheckCircle2, Images } from 'lucide-react';
-import { Worker } from '../types';
+import { Worker, isProfileVerified } from '../types';
 import { WorkerAvatar } from './WorkerAvatar';
 
 export interface WorkerMarketplaceCardProps {
@@ -14,7 +14,7 @@ export interface WorkerMarketplaceCardProps {
  * large "ver fotos de trabajos" CTA sits below it (~1/3).
  */
 export const WorkerMarketplaceCard: React.FC<WorkerMarketplaceCardProps> = ({ worker, onOpen }) => {
-  const isVerified = worker.verificationStatus === 'verified' || worker.verificado === true;
+  const isVerified = isProfileVerified(worker);
 
   const workPhotoList = (worker.workPhotos && worker.workPhotos.length > 0)
     ? worker.workPhotos

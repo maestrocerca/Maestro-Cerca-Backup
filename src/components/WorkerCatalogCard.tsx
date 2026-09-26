@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapPin, CheckCircle2, ChevronRight, Users } from 'lucide-react';
-import { Worker } from '../types';
+import { Worker, isProfileVerified } from '../types';
 import { WorkerAvatar } from './WorkerAvatar';
 
 export interface WorkerCatalogCardProps {
@@ -15,7 +15,7 @@ export interface WorkerCatalogCardProps {
  * Contact actions (WhatsApp/Llamar) live on the full profile page, not here.
  */
 export const WorkerCatalogCard: React.FC<WorkerCatalogCardProps> = ({ worker, onOpenProfile }) => {
-  const isVerified = worker.verificationStatus === 'verified' || worker.verificado === true;
+  const isVerified = isProfileVerified(worker);
 
   const workPhotoList = (worker.workPhotos && worker.workPhotos.length > 0)
     ? worker.workPhotos

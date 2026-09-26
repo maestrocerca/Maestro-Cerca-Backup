@@ -18,7 +18,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { Trade, Worker, isPubliclyVisible } from '../types';
+import { Trade, Worker, isPubliclyVisible, isProfileVerified } from '../types';
 import { WorkerMarketplaceCard } from './WorkerMarketplaceCard';
 
 export const HomeView: React.FC = () => {
@@ -87,8 +87,8 @@ export const HomeView: React.FC = () => {
     return workers
       .filter(isPubliclyVisible)
       .sort((a, b) => {
-        const aVerif = a.verificado === true || a.verificationStatus === 'verified';
-        const bVerif = b.verificado === true || b.verificationStatus === 'verified';
+        const aVerif = isProfileVerified(a);
+        const bVerif = isProfileVerified(b);
         if (aVerif && !bVerif) return -1;
         if (!aVerif && bVerif) return 1;
         const aPhotos = a.workPhotos?.length || a.fotosTrabajos?.length || 0;
@@ -120,7 +120,7 @@ export const HomeView: React.FC = () => {
   // Count verified and total public available workers
   const publicWorkers = workers.filter(isPubliclyVisible);
   const totalWorkersCount = publicWorkers.length;
-  const verifiedCount = publicWorkers.filter((w) => w.verificationStatus === 'verified' || w.verificado === true).length;
+  const verifiedCount = publicWorkers.filter(isProfileVerified).length;
 
   return (
     <div className="space-y-16 lg:space-y-24 pb-20">

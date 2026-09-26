@@ -23,7 +23,7 @@ import {
   Users
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { WorkPhoto, isPubliclyVisible } from '../types';
+import { WorkPhoto, isPubliclyVisible, isProfileVerified } from '../types';
 import { WorkerAvatar } from './WorkerAvatar';
 
 interface WorkerProfileViewProps {
@@ -112,7 +112,7 @@ export const WorkerProfileView: React.FC<WorkerProfileViewProps> = ({ workerSlug
     );
   }
 
-  const isVerified = worker.verificationStatus === 'verified' || worker.verificado === true;
+  const isVerified = isProfileVerified(worker);
   const workPhotosList = (worker.workPhotos && worker.workPhotos.length > 0)
     ? worker.workPhotos
     : (worker.fotosTrabajos && worker.fotosTrabajos.length > 0)

@@ -3,7 +3,7 @@ import { Search, MapPin, ShieldCheck, Filter, RotateCcw } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useStore } from '../context/StoreContext';
-import { Worker } from '../types';
+import { Worker, isProfileVerified } from '../types';
 import { WorkerCatalogCard } from './WorkerCatalogCard';
 
 interface SearchResultsViewProps {
@@ -97,7 +97,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
         }
 
         // Verified filter
-        if (verifiedOnly && !(w.verificado === true || w.verificationStatus === 'verified')) {
+        if (verifiedOnly && !isProfileVerified(w)) {
           return false;
         }
 
@@ -110,8 +110,8 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
       })
       .sort((a, b) => {
         // Boost verified workers first
-        const aVerif = a.verificado === true || a.verificationStatus === 'verified';
-        const bVerif = b.verificado === true || b.verificationStatus === 'verified';
+        const aVerif = isProfileVerified(a);
+        const bVerif = isProfileVerified(b);
         if (aVerif && !bVerif) return -1;
         if (!aVerif && bVerif) return 1;
 
