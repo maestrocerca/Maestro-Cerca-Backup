@@ -1,5 +1,5 @@
 import React from 'react';
-import { Hammer, ShieldCheck, Phone, MessageSquare, AlertCircle, SlidersHorizontal, Lock } from 'lucide-react';
+import { Hammer, ShieldCheck, MapPin, Phone, MessageSquare, AlertCircle, SlidersHorizontal, Lock } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { BrandLogo } from './BrandLogo';
 import footerLogo from '../assets/images/regenerated_image_1789674062841.jpg';
@@ -24,11 +24,11 @@ export const Footer: React.FC = () => {
       <div 
         className="mx-auto bg-[#0c2340]"
         style={{
-          paddingTop: '31px',
-          paddingBottom: '60px',
+          paddingTop: '63px',
+          paddingBottom: '66px',
           paddingLeft: '50px',
           paddingRight: '50px',
-          marginTop: '0px',
+          marginTop: '-2px',
           marginBottom: '0px',
           marginRight: '0px',
           maxWidth: '1151px',
@@ -38,52 +38,34 @@ export const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
           
           {/* Brand Col */}
-          <div 
-            className="lg:col-span-2 space-y-4"
-            style={{
-              width: '260px',
-              height: '180px',
-            }}
-          >
+          <div className="lg:col-span-2 space-y-4">
             <div 
               onClick={() => navigateTo({ type: 'home' })}
-              className="cursor-pointer inline-flex items-center bg-[#0c2340]"
-              style={{
-                marginTop: '0px',
-                marginBottom: '0px',
-                paddingLeft: '0px',
-                paddingRight: '0px',
-                paddingTop: '0px',
-                borderRadius: '0px',
-                height: '40px',
-                width: '100px',
-              }}
+              className="cursor-pointer inline-flex items-center bg-[#0c2340] px-3 pt-1 pb-1.5 -mt-0.5 rounded-xl shadow-xs"
             >
               <img 
                 src={footerLogo} 
                 alt="Maestro Cerca Logo" 
                 style={{
-                  height: '40px',
-                  marginTop: '0px',
-                  marginLeft: '0px',
-                  marginRight: '0px',
-                  marginBottom: '0px',
+                  height: '41px',
+                  width: '131.365px',
+                  marginLeft: '6px',
+                  marginRight: '4px',
+                  marginTop: '-2px',
+                  marginBottom: '-1px',
                 }}
                 className="object-contain" 
               />
             </div>
             
-            <p 
-              className="text-slate-400 text-sm leading-relaxed"
-              style={{
-                marginLeft: '0px',
-                marginBottom: '0px',
-                width: '240px',
-                height: '135px',
-              }}
-            >
+            <p className="text-slate-400 text-sm leading-relaxed max-w-sm ml-[18px]">
               Maestro Cerca conecta personas que necesitan trabajos de construcción, mantenimiento o remodelación con trabajadores de oficios confiables y verificados en todo el Estado de Querétaro.
             </p>
+
+            <div className="flex items-center gap-2 text-xs text-slate-400 ml-[18px]">
+              <MapPin className="w-4 h-4 text-orange-500 shrink-0" />
+              <span>Estado de Querétaro, México</span>
+            </div>
           </div>
 
           {/* Col 1: Clientes */}
@@ -181,13 +163,7 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Bottom bar */}
-        <div 
-          className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500"
-          style={{
-            height: '129.667px',
-            marginTop: '20px',
-          }}
-        >
+        <div className="mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>© {new Date().getFullYear()} Maestro Cerca. Todos los derechos reservados. Estado de Querétaro, México.</p>
           <div className="flex flex-wrap items-center gap-4 text-slate-400">
             <a

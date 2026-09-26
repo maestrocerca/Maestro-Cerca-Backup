@@ -123,25 +123,16 @@ export const HomeView: React.FC = () => {
   const verifiedCount = publicWorkers.filter((w) => w.verificationStatus === 'verified' || w.verificado === true).length;
 
   return (
-    <div 
-      className="space-y-16 lg:space-y-24"
-      style={{ paddingBottom: '80px', height: '5040px' }}
-    >
+    <div className="space-y-16 lg:space-y-24 pb-20">
       
       {/* 1. HERO SECTION */}
-      <section 
-        className="relative overflow-hidden bg-gradient-to-b from-orange-50/40 via-white to-[#FAFAFA] pt-[100px] border-b border-slate-200 mb-[84px]"
-        style={{ paddingBottom: '45px' }}
-      >
+      <section className="relative overflow-hidden bg-gradient-to-b from-orange-50/40 via-white to-[#FAFAFA] pt-[100px] pb-[56px] border-b border-slate-200 mb-[84px]">
 
         {/* Subtle decorative background accents */}
         <div className="absolute inset-0 bg-[radial-gradient(#ea580c_1px,transparent_1px)] [background-size:28px_28px] opacity-10 pointer-events-none" />
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
-          <h1 
-            style={{ fontSize: '29px' }}
-            className="sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.12] mb-8 sm:mb-10"
-          >
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.12] mb-8 sm:mb-10">
             Encuentra trabajadores de <span className="text-orange-600">confianza</span> cerca de ti
           </h1>
 
@@ -308,53 +299,21 @@ export const HomeView: React.FC = () => {
 
       {/* SECCIÓN SOBRE CONFIANZA */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div 
-          className="bg-slate-900 text-white rounded-3xl relative overflow-hidden border border-slate-800"
-          style={{
-            width: '330px',
-            height: '1100px',
-            paddingLeft: '40px',
-            paddingRight: '40px',
-            paddingTop: '50px',
-            paddingBottom: '20px',
-            marginLeft: '0px',
-            marginBottom: '0px',
-          }}
-        >
+        <div className="bg-slate-900 text-white rounded-3xl pt-[65px] pl-16 pb-16 pr-8 sm:pr-12 lg:pr-16 relative overflow-hidden border border-slate-800">
           
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             
-            <div 
-              className="lg:col-span-7 space-y-6"
-              style={{
-                width: '250px',
-                height: '550px',
-              }}
-            >
+            <div className="lg:col-span-7 space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-green-950 text-green-300 border border-green-800/80 text-xs font-semibold">
                 <ShieldCheck className="w-4 h-4 text-green-400" />
                 <span>Niveles de perfil y confianza</span>
               </div>
 
-              <h2 
-                className="font-black text-white tracking-tight"
-                style={{
-                  marginBottom: '6px',
-                  height: '75px',
-                  fontSize: '21px',
-                  lineHeight: '24px',
-                  textAlign: 'left',
-                }}
-              >
+              <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
                 Trabajadores con información que puedes revisar
               </h2>
 
-              <p 
-                className="text-slate-300 text-sm sm:text-base leading-relaxed"
-                style={{
-                  marginBottom: '15px',
-                }}
-              >
+              <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
                 Maestro Cerca busca crear un directorio transparente donde los trabajadores independientes puedan mostrar su experiencia real, fotografías de proyectos terminados, referencias laborales y verificaciones de identidad.
               </p>
 
@@ -383,15 +342,7 @@ export const HomeView: React.FC = () => {
             </div>
 
             {/* Trust checklist visual */}
-            <div 
-              className="lg:col-span-5 bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-700 space-y-4"
-              style={{
-                height: '408px',
-                width: '250.667px',
-                paddingTop: '23px',
-                paddingRight: '24px',
-              }}
-            >
+            <div className="lg:col-span-5 bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-700 space-y-4">
               <h3 className="font-bold text-slate-100 text-lg flex items-center gap-2">
                 <Award className="w-5 h-5 text-orange-400" />
                 <span>Señales de verificación</span>
@@ -442,20 +393,7 @@ export const HomeView: React.FC = () => {
 
       {/* 5. CTA DESTACADO PARA TRABAJADORES */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div 
-          className="bg-black text-white text-center sm:text-left relative overflow-hidden shadow-lg border border-slate-800"
-          style={{
-            paddingTop: '30px',
-            paddingBottom: '30px',
-            paddingLeft: '30px',
-            paddingRight: '30px',
-            borderRadius: '30px',
-            width: '330px',
-            marginLeft: '0px',
-            marginRight: '0px',
-            minHeight: '450px',
-          }}
-        >
+        <div className="bg-black text-white rounded-3xl pt-[56px] px-8 sm:px-12 lg:px-14 pb-8 sm:pb-12 lg:pb-14 text-center sm:text-left relative overflow-hidden shadow-lg border border-slate-800">
           
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
             
