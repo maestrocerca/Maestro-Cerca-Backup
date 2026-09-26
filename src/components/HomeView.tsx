@@ -123,10 +123,16 @@ export const HomeView: React.FC = () => {
   const verifiedCount = publicWorkers.filter((w) => w.verificationStatus === 'verified' || w.verificado === true).length;
 
   return (
-    <div className="space-y-16 lg:space-y-24 pb-20">
+    <div 
+      className="space-y-16 lg:space-y-24"
+      style={{ paddingBottom: '80px' }}
+    >
       
       {/* 1. HERO SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-orange-50/40 via-white to-[#FAFAFA] pt-[100px] pb-[56px] border-b border-slate-200 mb-[84px]">
+      <section 
+        className="relative overflow-hidden bg-gradient-to-b from-orange-50/40 via-white to-[#FAFAFA] pt-[100px] border-b border-slate-200 mb-[84px]"
+        style={{ paddingBottom: '45px' }}
+      >
 
         {/* Subtle decorative background accents */}
         <div className="absolute inset-0 bg-[radial-gradient(#ea580c_1px,transparent_1px)] [background-size:28px_28px] opacity-10 pointer-events-none" />
@@ -393,7 +399,19 @@ export const HomeView: React.FC = () => {
 
       {/* 5. CTA DESTACADO PARA TRABAJADORES */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-black text-white rounded-3xl pt-[56px] px-8 sm:px-12 lg:px-14 pb-8 sm:pb-12 lg:pb-14 text-center sm:text-left relative overflow-hidden shadow-lg border border-slate-800">
+        <div 
+          className="bg-black text-white text-center sm:text-left relative overflow-hidden shadow-lg border border-slate-800"
+          style={{
+            paddingTop: '30px',
+            paddingBottom: '30px',
+            paddingLeft: '30px',
+            paddingRight: '30px',
+            borderRadius: '30px',
+            maxWidth: '327px',
+            minHeight: '450px',
+            margin: '0 auto',
+          }}
+        >
           
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
             
