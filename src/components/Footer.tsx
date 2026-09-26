@@ -181,7 +181,13 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div 
+          className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500"
+          style={{
+            height: '129.667px',
+            marginTop: '20px',
+          }}
+        >
           <p>© {new Date().getFullYear()} Maestro Cerca. Todos los derechos reservados. Estado de Querétaro, México.</p>
           <div className="flex flex-wrap items-center gap-4 text-slate-400">
             <a
