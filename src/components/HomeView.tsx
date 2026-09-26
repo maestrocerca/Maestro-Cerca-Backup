@@ -133,7 +133,7 @@ export const HomeView: React.FC = () => {
         <div className="absolute inset-0 bg-[radial-gradient(#ea580c_1px,transparent_1px)] [background-size:28px_28px] opacity-10 pointer-events-none" />
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.12] mb-8 sm:mb-10">
+          <h1 className="text-2xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.2] sm:leading-[1.12] mb-8 sm:mb-10">
             Encuentra trabajadores de <span className="text-orange-600">confianza</span> cerca de ti
           </h1>
 

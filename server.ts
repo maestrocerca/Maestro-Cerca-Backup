@@ -349,6 +349,14 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Trust exactly one hop of reverse proxy (the platform's own edge in front
+  // of this Cloud Run/App Hosting container). This makes Express parse
+  // X-Forwarded-For correctly (rightmost untrusted entry = req.ip) instead of
+  // blindly trusting whatever a client sends as the first entry, which would
+  // let anyone forge their apparent IP and get a fresh bucket on every
+  // IP-keyed rate limiter below.
+  app.set("trust proxy", 1);
+
   // JSON and URL-encoded body parsers
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
@@ -395,7 +403,7 @@ async function startServer() {
     }, 5 * 60 * 1000);
 
     return (req: Request, res: Response, next: () => void) => {
-      const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown-client";
+      const clientIp = req.ip || "unknown-client";
       const now = Date.now();
       const record = hits.get(clientIp);
       if (!record || now > record.resetAt) {
@@ -1372,7 +1380,7 @@ async function startServer() {
   // out for a value that lives inside a third-party SaaS UI.
   // =========================================================================
   app.post("/api/manychat/account-action", manyChatWebhookRateLimit, async (req: Request, res: Response): Promise<void> => {
-    const callerIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown-client";
+    const callerIp = req.ip || "unknown-client";
     try {
       const expectedSecret = process.env.MANYCHAT_ACCOUNT_ACTION_SECRET;
       if (!expectedSecret || expectedSecret.trim() === "") {
@@ -1702,7 +1710,7 @@ async function startServer() {
   const handlePhoneStatusCheck = async (req: Request, res: Response): Promise<void> => {
     try {
       // 1. Rate limiting check (anti-enumeration)
-      const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown-client";
+      const clientIp = req.ip || "unknown-client";
       if (!checkPhoneStatusRateLimit(clientIp)) {
         res.status(429).json({
           success: false,
@@ -2547,7 +2555,7 @@ async function startServer() {
 
   app.post("/api/profile-reports", async (req: Request, res: Response) => {
     try {
-      const clientKey = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "client");
+      const clientKey = req.ip || "client";
       if (isReportRateLimited(clientKey)) {
         return res.status(429).json({ error: "Has enviado varios reportes recientemente. Por favor espera un momento." });
       }
