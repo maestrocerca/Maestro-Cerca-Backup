@@ -137,14 +137,17 @@ export const HomeView: React.FC = () => {
           </h1>
 
           {/* MAIN SEARCH BOX */}
-          <div className="max-w-3xl mx-auto bg-white p-3 sm:p-4 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 text-left">
+          <div 
+            className="max-w-[780px] w-full mx-auto bg-white p-3 sm:p-4 rounded-[50px] shadow-xl shadow-slate-200/50 border border-slate-200 text-left"
+            style={{
+              borderRadius: '50px',
+              maxWidth: '780px',
+            }}
+          >
             <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-3">
 
               {/* Field 1: Oficio (free text, animated rotating placeholder + suggestions) */}
               <div ref={tradeFieldRef} className={`relative ${selectedArea || tradeQuery ? 'md:col-span-5' : 'md:col-span-9'}`}>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  ¿Qué necesitas?
-                </label>
                 <div className="relative">
                   <input
                     id="hero-trade-input"
@@ -157,7 +160,8 @@ export const HomeView: React.FC = () => {
                       setShowTradeSuggestions(true);
                     }}
                     onFocus={() => setShowTradeSuggestions(true)}
-                    className="w-full pl-10 pr-8 py-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-slate-800 font-medium text-sm sm:text-base focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    style={{ borderRadius: '30px' }}
+                    className="w-full pl-10 pr-8 py-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-[30px] text-slate-800 font-medium text-sm sm:text-base focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
                   />
                   <Hammer className="w-5 h-5 text-orange-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
 
@@ -197,9 +201,6 @@ export const HomeView: React.FC = () => {
               {/* Field 2: Zona — only appears once the worker has started typing what they need */}
               {(tradeQuery || selectedArea) && (
                 <div className="md:col-span-4 relative animate-in fade-in slide-in-from-left-2 duration-300">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    ¿Dónde necesitas el trabajo?
-                  </label>
                   <div className="relative">
                     <select
                       id="hero-area-select"
@@ -224,7 +225,8 @@ export const HomeView: React.FC = () => {
                 <button
                   type="submit"
                   id="hero-search-submit-btn"
-                  className="w-full py-3.5 px-5 bg-slate-900 hover:bg-black active:scale-[0.98] text-white font-bold text-sm sm:text-base rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  style={{ borderRadius: '30px' }}
+                  className="w-full py-3.5 px-5 bg-slate-900 hover:bg-black active:scale-[0.98] text-white font-bold text-sm sm:text-base rounded-[30px] shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Search className="w-5 h-5 text-orange-400" />
                   <span>Buscar</span>
