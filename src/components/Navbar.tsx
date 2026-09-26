@@ -42,7 +42,12 @@ export const Navbar: React.FC = () => {
             <img
               src="/Logo%20Oficial%20para%20sitio%20web.jpg"
               alt="Maestro Cerca - Ir a la página principal"
-              className="h-10 sm:h-12 w-auto object-contain pl-[22px] pt-[2px] pr-0 pb-[3px]"
+              style={{
+                paddingLeft: '0px',
+                paddingTop: '0px',
+                paddingBottom: '0px',
+              }}
+              className="h-10 sm:h-12 w-auto object-contain p-0"
             />
           </div>
 
