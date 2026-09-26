@@ -42,7 +42,12 @@ export const Navbar: React.FC = () => {
             <img
               src="/Logo%20Oficial%20para%20sitio%20web.jpg"
               alt="Maestro Cerca - Ir a la página principal"
-              className="h-10 sm:h-12 w-auto object-contain pl-[22px] pt-[2px] pr-0 pb-[3px]"
+              style={{
+                paddingLeft: '0px',
+                paddingTop: '0px',
+                paddingBottom: '0px',
+              }}
+              className="h-10 sm:h-12 w-auto object-contain p-0"
             />
           </div>
 
@@ -105,18 +110,12 @@ export const Navbar: React.FC = () => {
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>
-            ) : isWorkerRegistrationActive ? (
-              <div className="flex items-center ml-2">
-                <span className="text-xs font-semibold text-amber-800 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200">
-                  Registro en proceso
-                </span>
-              </div>
-            ) : (
+            ) : isWorkerRegistrationActive ? null : (
               <div className="flex items-center gap-2 ml-2">
                 <button
                   id="nav-worker-login-btn"
                   onClick={() => navigateTo({ type: 'login' })}
-                  className="px-3.5 py-2 rounded-lg text-slate-600 hover:text-slate-900 text-sm font-medium hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="px-3.5 py-2 rounded-lg text-white text-sm font-medium hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   Iniciar sesión
                 </button>

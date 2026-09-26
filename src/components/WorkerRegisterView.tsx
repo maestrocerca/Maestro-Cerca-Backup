@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CheckCircle2, 
   ShieldCheck, 
@@ -28,7 +28,6 @@ import {
 import { Worker, WorkPhoto } from '../types';
 import { auth } from '../lib/firebase';
 import { WorkerAvatar } from './WorkerAvatar';
-import { BrandLogoIcon } from './BrandLogo';
 import { uploadWorkerProfileImage, uploadWorkerWorkPhoto, validateImageFile } from '../lib/storage';
 import { FACEBOOK_AUTH_ENABLED } from '../config/featureFlags';
 
@@ -911,11 +910,6 @@ export const WorkerRegisterView: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#FAF8F5] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto space-y-5 sm:space-y-6">
-
-        {/* Logo: always visible during registration */}
-        <div className="flex items-center justify-center">
-          <BrandLogoIcon size={44} />
-        </div>
 
         {/* Progress Bar & Cancel Link */}
         {step < 6 && (

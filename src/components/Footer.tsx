@@ -1,5 +1,5 @@
 import React from 'react';
-import { Hammer, ShieldCheck, MapPin, Phone, MessageSquare, AlertCircle, SlidersHorizontal, Lock } from 'lucide-react';
+import { Hammer, ShieldCheck, Phone, MessageSquare, AlertCircle, SlidersHorizontal, Lock } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { BrandLogo } from './BrandLogo';
 import footerLogo from '../assets/images/regenerated_image_1789674062841.jpg';
@@ -21,35 +21,74 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16 bg-[#0c2340]">
+      <div 
+        className="mx-auto bg-[#0c2340]"
+        style={{
+          paddingTop: '31px',
+          paddingBottom: '60px',
+          paddingLeft: '50px',
+          paddingRight: '50px',
+          marginTop: '0px',
+          marginBottom: '0px',
+          marginRight: '0px',
+          maxWidth: '1151px',
+          width: '100%',
+        }}
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
           
           {/* Brand Col */}
-          <div className="lg:col-span-2 space-y-4">
+          <div 
+            className="lg:col-span-2 space-y-4"
+            style={{
+              width: '260px',
+              height: '180px',
+            }}
+          >
             <div 
               onClick={() => navigateTo({ type: 'home' })}
-              className="cursor-pointer inline-flex items-center bg-[#0c2340] px-3 pt-1 pb-1.5 -mt-0.5 rounded-xl shadow-xs"
+              className="cursor-pointer inline-flex items-center bg-[#0c2340]"
+              style={{
+                marginTop: '0px',
+                marginBottom: '0px',
+                paddingLeft: '0px',
+                paddingRight: '0px',
+                paddingTop: '0px',
+                borderRadius: '0px',
+                height: '40px',
+                width: '100px',
+              }}
             >
               <img 
                 src={footerLogo} 
                 alt="Maestro Cerca Logo" 
-                className="h-9 sm:h-10 w-auto object-contain p-0 m-0" 
+                style={{
+                  height: '40px',
+                  marginTop: '0px',
+                  marginLeft: '0px',
+                  marginRight: '0px',
+                  marginBottom: '0px',
+                }}
+                className="object-contain" 
               />
             </div>
             
-            <p className="text-slate-400 text-sm leading-relaxed max-w-sm ml-[18px]">
+            <p 
+              className="text-slate-400 text-sm leading-relaxed"
+              style={{
+                marginLeft: '0px',
+                marginBottom: '0px',
+                width: '240px',
+                height: '135px',
+              }}
+            >
               Maestro Cerca conecta personas que necesitan trabajos de construcción, mantenimiento o remodelación con trabajadores de oficios confiables y verificados en todo el Estado de Querétaro.
             </p>
-
-            <div className="flex items-center gap-2 text-xs text-slate-400 ml-[18px]">
-              <MapPin className="w-4 h-4 text-orange-500 shrink-0" />
-              <span>Estado de Querétaro, México</span>
-            </div>
           </div>
 
           {/* Col 1: Clientes */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff8415]">
               Para clientes
             </h4>
             <ul className="space-y-2 text-sm">
@@ -66,14 +105,14 @@ export const Footer: React.FC = () => {
 
           {/* Col 2: Trabajadores */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff8415]">
               Para trabajadores
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <button
                   onClick={() => navigateTo({ type: 'register' })}
-                  className="text-orange-400 hover:text-orange-300 font-medium transition-colors text-left"
+                  className="text-white hover:text-orange-300 font-medium transition-colors text-left"
                 >
                   Registrarme como trabajador
                 </button>
@@ -90,8 +129,14 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Col 3: Legal & Soporte */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+          <div 
+            className="space-y-3"
+            style={{
+              width: '167.802px',
+              minHeight: '172px',
+            }}
+          >
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff8415]">
               Legal y soporte
             </h4>
             <ul className="space-y-2 text-sm">
@@ -136,7 +181,13 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div 
+          className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500"
+          style={{
+            height: '129.667px',
+            marginTop: '20px',
+          }}
+        >
           <p>© {new Date().getFullYear()} Maestro Cerca. Todos los derechos reservados. Estado de Querétaro, México.</p>
           <div className="flex flex-wrap items-center gap-4 text-slate-400">
             <a
